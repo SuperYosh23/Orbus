@@ -33,7 +33,7 @@ class OrbusLauncher(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Orbus Launcher")
-        self.geometry("1000x650")
+        self.geometry("1000x750")
 
         self.instances = self.load_config()
         self.current_instance_name = None
@@ -78,15 +78,22 @@ class OrbusLauncher(ctk.CTk):
         self.username_entry = ctk.CTkEntry(self.settings_frame)
         self.username_entry.pack(fill="x", padx=20, pady=(5, 10))
 
-        ctk.CTkLabel(self.settings_frame, text="Version").pack(anchor="w", padx=20)
+        ctk.CTkLabel(self.settings_frame, text="MC Version").pack(anchor="w", padx=20)
         self.version_combo = ctk.CTkComboBox(self.settings_frame, values=["1.21.1", "1.20.1"])
         self.version_combo.pack(fill="x", padx=20, pady=(5, 10))
 
         ctk.CTkLabel(self.settings_frame, text="Mod Loader").pack(anchor="w", padx=20)
-        self.loader_combo = ctk.CTkComboBox(self.settings_frame, values=["Vanilla", "Fabric", "Quilt"])
-        self.loader_combo.pack(fill="x", padx=20, pady=(5, 15))
+        self.loader_combo = ctk.CTkComboBox(self.settings_frame, values=["Vanilla", "Fabric", "Quilt"], command=self.toggle_loader_settings)
+        self.loader_combo.pack(fill="x", padx=20, pady=(5, 10))
 
-        self.mods_btn = ctk.CTkButton(self.settings_frame, text="Open Mods Folder", command=self.open_mods_folder, fg_color="gray30")
+        self.loader_ver_label = ctk.CTkLabel(self.settings_frame, text="Fabric Loader Version")
+        self.loader_ver_combo = ctk.CTkComboBox(self.settings_frame, values=["latest"])
+        
+        # --- NEW BUTTONS ---
+        self.folder_btn = ctk.CTkButton(self.settings_frame, text="📂 Open Instance Folder", command=self.open_instance_folder, fg_color="gray30")
+        self.folder_btn.pack(fill="x", padx=20, pady=(10, 5))
+
+        self.mods_btn = ctk.CTkButton(self.settings_frame, text="🧩 Open Mods Folder", command=self.open_mods_folder, fg_color="gray30")
         self.mods_btn.pack(fill="x", padx=20, pady=(0, 20))
 
         self.status_label = ctk.CTkLabel(self.main_frame, text="Ready", text_color="gray")
@@ -97,6 +104,7 @@ class OrbusLauncher(ctk.CTk):
 
         self.refresh_instance_buttons()
         threading.Thread(target=self.load_versions_bg, daemon=True).start()
+        threading.Thread(target=self.load_fabric_versions_bg, daemon=True).start()
 
     # --- UI Logic ---
     def load_config(self):
@@ -111,7 +119,8 @@ class OrbusLauncher(ctk.CTk):
             self.instances[self.current_instance_name] = {
                 "username": self.username_entry.get(),
                 "version": self.version_combo.get(),
-                "loader": self.loader_combo.get()
+                "loader": self.loader_combo.get(),
+                "loader_version": self.loader_ver_combo.get()
             }
         with open(CONFIG_FILE, 'w') as f: json.dump(self.instances, f, indent=4)
 
@@ -121,6 +130,21 @@ class OrbusLauncher(ctk.CTk):
             rel = [v["id"] for v in versions if v["type"] == "release"]
             self.after(0, lambda: self.version_combo.configure(values=rel[:50]))
         except: pass
+
+    def load_fabric_versions_bg(self):
+        try:
+            data = requests.get("https://meta.fabricmc.net/v2/versions/loader").json()
+            versions = ["latest"] + [v["version"] for v in data]
+            self.after(0, lambda: self.loader_ver_combo.configure(values=versions[:50]))
+        except: pass
+
+    def toggle_loader_settings(self, choice):
+        if choice == "Fabric":
+            self.loader_ver_label.pack(anchor="w", padx=20)
+            self.loader_ver_combo.pack(fill="x", padx=20, pady=(5, 10))
+        else:
+            self.loader_ver_label.pack_forget()
+            self.loader_ver_combo.pack_forget()
 
     def refresh_instance_buttons(self):
         for w in self.scrollable_list.winfo_children(): w.destroy()
@@ -137,11 +161,13 @@ class OrbusLauncher(ctk.CTk):
         self.username_entry.insert(0, d.get("username", ""))
         self.version_combo.set(d.get("version", "1.21.1"))
         self.loader_combo.set(d.get("loader", "Vanilla"))
+        self.loader_ver_combo.set(d.get("loader_version", "latest"))
+        self.toggle_loader_settings(d.get("loader", "Vanilla"))
 
     def add_instance(self):
         n = simpledialog.askstring("New", "Instance Name:")
         if n and n not in self.instances:
-            self.instances[n] = {"username": "", "version": "1.21.1", "loader": "Vanilla"}
+            self.instances[n] = {"username": "", "version": "1.21.1", "loader": "Vanilla", "loader_version": "latest"}
             self.save_config(); self.refresh_instance_buttons(); self.select_instance(n)
 
     def delete_instance(self):
@@ -160,14 +186,22 @@ class OrbusLauncher(ctk.CTk):
         if self.current_instance_name:
             p = os.path.join(INSTANCES_DIR, self.current_instance_name, "mods")
             os.makedirs(p, exist_ok=True)
-            if sys.platform == "win32": os.startfile(p)
-            else: subprocess.Popen(["xdg-open", p])
+            self.open_path(p)
 
+    def open_instance_folder(self):
+        if self.current_instance_name:
+            p = os.path.join(INSTANCES_DIR, self.current_instance_name)
+            self.open_path(p)
+
+    def open_path(self, path):
+        if sys.platform == "win32": os.startfile(path)
+        else: subprocess.Popen(["xdg-open", path])
+
+    # --- MODPACK FIX: Extracting Overrides ---
     def open_modrinth_search(self):
         self.search_win = ctk.CTkToplevel(self)
         self.search_win.title("Modrinth Browser")
         self.search_win.geometry("750x650")
-        self.search_win.attributes("-topmost", True)
         container = ctk.CTkFrame(self.search_win)
         container.pack(fill="x", padx=20, pady=20)
         self.search_entry = ctk.CTkEntry(container, placeholder_text="Search modpacks...")
@@ -177,35 +211,34 @@ class OrbusLauncher(ctk.CTk):
         self.results_frame.pack(fill="both", expand=True, padx=20, pady=(0, 20))
         self.perform_modrinth_search(True)
 
-    def perform_modrinth_search(self, is_recommendation=False):
-        query = self.search_entry.get() if not is_recommendation else ""
+    def perform_modrinth_search(self, is_rec=False):
+        q = self.search_entry.get() if not is_rec else ""
         for w in self.results_frame.winfo_children(): w.destroy()
         def run():
             try:
-                facets = json.dumps([["project_type:modpack"], ["categories:fabric", "categories:quilt"]])
-                url = f"https://api.modrinth.com/v2/search?query={query}&facets={facets}&limit=20"
-                data = requests.get(url, headers={"User-Agent": "Orbus/2.8"}).json()
-                for hit in data.get("hits", []):
-                    self.after(0, lambda h=hit: self.add_search_result(h))
+                f = json.dumps([["project_type:modpack"], ["categories:fabric", "categories:quilt"]])
+                u = f"https://api.modrinth.com/v2/search?query={q}&facets={f}&limit=20"
+                d = requests.get(u, headers={"User-Agent": "Orbus/3.1"}).json()
+                for h in d.get("hits", []): self.after(0, lambda x=h: self.add_search_result(x))
             except: pass
         threading.Thread(target=run, daemon=True).start()
 
-    def add_search_result(self, hit):
-        f = ctk.CTkFrame(self.results_frame)
-        f.pack(fill="x", pady=5, padx=5)
-        ctk.CTkLabel(f, text="📦", width=50).pack(side="left", padx=10)
-        ctk.CTkLabel(f, text=f"{hit['title']}\nby {hit['author']}", anchor="w", justify="left").pack(side="left", padx=10, fill="x", expand=True)
-        ctk.CTkButton(f, text="Install", width=80, command=lambda p=hit['project_id']: self.install_from_modrinth(p)).pack(side="right", padx=10)
+    def add_search_result(self, h):
+        fr = ctk.CTkFrame(self.results_frame)
+        fr.pack(fill="x", pady=5, padx=5)
+        ctk.CTkLabel(fr, text="📦", width=50).pack(side="left", padx=10)
+        ctk.CTkLabel(fr, text=f"{h['title']}\nby {h['author']}", anchor="w", justify="left").pack(side="left", padx=10, fill="x", expand=True)
+        ctk.CTkButton(fr, text="Install", width=80, command=lambda p=h['project_id']: self.install_from_modrinth(p)).pack(side="right", padx=10)
 
     def install_from_modrinth(self, pid):
         def run():
             try:
                 self.after(0, lambda: self.show_progress_ui("Downloading..."))
-                vers = requests.get(f"https://api.modrinth.com/v2/project/{pid}/version").json()
-                file_url = vers[0]['files'][0]['url']
-                temp = os.path.join(INSTANCES_DIR, "download.mrpack")
-                with open(temp, "wb") as f: f.write(requests.get(file_url).content)
-                self.process_modpack(temp)
+                v = requests.get(f"https://api.modrinth.com/v2/project/{pid}/version").json()
+                u = v[0]['files'][0]['url']
+                t = os.path.join(INSTANCES_DIR, "download.mrpack")
+                with open(t, "wb") as f: f.write(requests.get(u).content)
+                self.process_modpack(t)
             except Exception as e: self.after(0, lambda: messagebox.showerror("Error", str(e)))
         threading.Thread(target=run, daemon=True).start()
 
@@ -219,30 +252,42 @@ class OrbusLauncher(ctk.CTk):
                 if "modrinth.index.json" in z.namelist(): self.install_mrpack(z)
                 else: self.install_basic_zip(z, path)
             self.after(0, self.cleanup_installation)
-        except Exception as e:
-            self.after(0, lambda: messagebox.showerror("Error", str(e)))
+        except Exception as e: self.after(0, lambda: messagebox.showerror("Error", str(e)))
 
     def cleanup_installation(self):
         if self.progress_win: self.progress_win.destroy()
         self.refresh_instance_buttons(); messagebox.showinfo("Success", "Done!")
 
-    def install_mrpack(self, zip_ref):
-        idx = json.loads(zip_ref.read("modrinth.index.json"))
-        name = idx.get("name", "Pack"); deps = idx["dependencies"]
-        loader = "Fabric" if "fabric-loader" in deps else "Quilt" if "quilt-loader" in deps else "Vanilla"
-        self.instances[name] = {"username": self.username_entry.get(), "version": deps["minecraft"], "loader": loader}
-        self.save_config(); path = os.path.join(INSTANCES_DIR, name); os.makedirs(path, exist_ok=True)
-        files = idx.get("files", [])
-        for i, f_obj in enumerate(files):
-            self.after(0, lambda v=(i+1)/len(files): self.prog_bar.set(v))
-            dest = os.path.join(path, f_obj["path"]); os.makedirs(os.path.dirname(dest), exist_ok=True)
-            with open(dest, "wb") as f: f.write(requests.get(f_obj["downloads"][0]).content)
+    def install_mrpack(self, z):
+        idx = json.loads(z.read("modrinth.index.json"))
+        n = idx.get("name", "Pack"); d = idx["dependencies"]
+        ldr = "Fabric" if "fabric-loader" in d else "Quilt" if "quilt-loader" in d else "Vanilla"
+        self.instances[n] = {"username": self.username_entry.get(), "version": d["minecraft"], "loader": ldr, "loader_version": "latest"}
+        self.save_config(); p = os.path.join(INSTANCES_DIR, n); os.makedirs(p, exist_ok=True)
+        
+        # 1. Download Mods
+        fs = idx.get("files", [])
+        for i, f_o in enumerate(fs):
+            self.after(0, lambda v=(i+1)/len(fs): self.prog_bar.set(v))
+            dst = os.path.join(p, f_o["path"]); os.makedirs(os.path.dirname(dst), exist_ok=True)
+            with open(dst, "wb") as f: f.write(requests.get(f_o["downloads"][0]).content)
+        
+        # 2. Extract Overrides (This is where CONFIGS are hidden!)
+        for file in z.namelist():
+            if file.startswith("overrides/"):
+                rel_path = file.replace("overrides/", "")
+                if rel_path:
+                    dest = os.path.join(p, rel_path)
+                    if file.endswith("/"): os.makedirs(dest, exist_ok=True)
+                    else:
+                        os.makedirs(os.path.dirname(dest), exist_ok=True)
+                        with open(dest, "wb") as f: f.write(z.read(file))
 
-    def install_basic_zip(self, zip_ref, original_path):
-        name = os.path.splitext(os.path.basename(original_path))[0]
-        self.instances[name] = {"username": "", "version": "1.21.1", "loader": "Vanilla"}
-        self.save_config(); path = os.path.join(INSTANCES_DIR, name); os.makedirs(path, exist_ok=True)
-        zip_ref.extractall(path)
+    def install_basic_zip(self, z, p_orig):
+        n = os.path.splitext(os.path.basename(p_orig))[0]
+        self.instances[n] = {"username": "", "version": "1.21.1", "loader": "Vanilla", "loader_version": "latest"}
+        self.save_config(); p = os.path.join(INSTANCES_DIR, n); os.makedirs(p, exist_ok=True)
+        z.extractall(p)
 
     def show_progress_ui(self, txt):
         if self.progress_win: self.progress_win.destroy()
@@ -250,7 +295,7 @@ class OrbusLauncher(ctk.CTk):
         ctk.CTkLabel(self.progress_win, text=txt).pack(pady=20)
         self.prog_bar = ctk.CTkProgressBar(self.progress_win, width=300); self.prog_bar.pack(); self.prog_bar.set(0)
 
-    # --- THE LAUNCHER LOGIC ---
+    # --- LAUNCH LOGIC ---
     def start_launch_thread(self):
         if self.current_instance_name:
             self.save_config()
@@ -263,12 +308,14 @@ class OrbusLauncher(ctk.CTk):
             target = self.current_instance_name
             d = self.instances[target].copy()
             v, loader, user = d.get("version"), d.get("loader", "Vanilla"), d.get("username")
+            l_ver = d.get("loader_version", "latest")
             
-            if not v or not user:
-                raise Exception("Version or Username is missing.")
+            if not v or not user: raise Exception("Version or Username missing.")
 
             inst_dir = os.path.abspath(os.path.join(INSTANCES_DIR, target))
             os.makedirs(inst_dir, exist_ok=True)
+            # Create config dir if missing
+            os.makedirs(os.path.join(inst_dir, "config"), exist_ok=True)
 
             def set_st(t): self.after(0, lambda: self.status_label.configure(text=t))
             set_st(f"Preparing {target}...")
@@ -277,67 +324,53 @@ class OrbusLauncher(ctk.CTk):
 
             l_id = str(v)
             if loader == "Fabric":
-                set_st("Installing Fabric...")
-                installed_id = minecraft_launcher_lib.fabric.install_fabric(v, MINECRAFT_DIR)
-                l_id = installed_id if installed_id else v
+                actual_loader = l_ver
+                if l_ver == "latest":
+                    fabric_meta = requests.get("https://meta.fabricmc.net/v2/versions/loader").json()
+                    actual_loader = fabric_meta[0]["version"]
+                minecraft_launcher_lib.fabric.install_fabric(v, MINECRAFT_DIR, loader_version=actual_loader)
+                l_id = f"fabric-loader-{actual_loader}-{v}"
             elif loader == "Quilt":
-                set_st("Installing Quilt...")
-                installed_id = minecraft_launcher_lib.quilt.install_quilt(v, MINECRAFT_DIR)
-                l_id = installed_id if installed_id else v
+                minecraft_launcher_lib.quilt.install_quilt(v, MINECRAFT_DIR)
+                l_id = f"quilt-loader-{v}"
 
-            set_st("Launching Process...")
+            set_st("Checking files...")
             java = shutil.which("javaw") or shutil.which("java") or "java"
             opts = {"username": user, "uuid": "0", "token": "0", "gameDir": inst_dir, "executablePath": java}
             
             cmd = minecraft_launcher_lib.command.get_minecraft_command(l_id, MINECRAFT_DIR, opts)
             
-            if "--gameDir" not in cmd:
-                cmd.extend(["--gameDir", inst_dir])
+            # STRENGTHENED GameDir Enforcement
+            if "--gameDir" not in cmd: cmd.extend(["--gameDir", inst_dir])
             else:
                 for i, arg in enumerate(cmd):
                     if arg == "--gameDir": cmd[i+1] = inst_dir
 
-            # --- LOG WINDOW SETUP ---
             log_win = ctk.CTkToplevel(self)
             log_win.title(f"Logs - {target}")
             log_win.geometry("800x400")
-            
             log_text = ctk.CTkTextbox(log_win, font=("Courier New", 12))
             log_text.pack(expand=True, fill="both", padx=10, pady=10)
 
-            # Start the game process
-            process = subprocess.Popen(
-                cmd, 
-                cwd=inst_dir, 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.STDOUT, 
-                text=True,
-                bufsize=1
-            )
+            # Important: set cwd to inst_dir so the game looks there first
+            process = subprocess.Popen(cmd, cwd=inst_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
 
-            # Thread to pipe stdout to the textbox
             def stream_logs():
                 for line in iter(process.stdout.readline, ""):
-                    if line:
-                        self.after(0, lambda l=line: self.append_log(log_text, l))
+                    if line: self.after(0, lambda l=line: self.append_log(log_text, l))
                 process.stdout.close()
 
             threading.Thread(target=stream_logs, daemon=True).start()
-            
-            # Hide the main launcher window
             self.withdraw()
             
-            # Check if game closed to bring back launcher
             def check_alive():
-                if process.poll() is None:
-                    self.after(1000, check_alive)
+                if process.poll() is None: self.after(1000, check_alive)
                 else:
                     self.after(0, self.deiconify)
                     self.after(0, lambda: self.launch_btn.configure(state="normal", text="LAUNCH GAME"))
                     self.after(0, lambda: self.status_label.configure(text="Ready"))
 
             check_alive()
-
         except Exception as e:
             self.after(0, lambda: messagebox.showerror("Launch Error", f"Failure: {str(e)}"))
             self.after(0, lambda: self.launch_btn.configure(state="normal", text="LAUNCH GAME"))
