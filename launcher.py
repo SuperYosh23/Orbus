@@ -33,7 +33,7 @@ class OrbusLauncher(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Orbus Launcher")
-        self.geometry("1000x750")
+        self.geometry("1000x800") # Increased height for more settings
 
         self.instances = self.load_config()
         self.current_instance_name = None
@@ -69,11 +69,12 @@ class OrbusLauncher(ctk.CTk):
         self.main_frame.grid(row=0, column=1, sticky="nsew", padx=30, pady=30)
 
         self.header_label = ctk.CTkLabel(self.main_frame, text="Select an Instance", font=ctk.CTkFont(size=32, weight="bold"))
-        self.header_label.pack(pady=(10, 30))
+        self.header_label.pack(pady=(10, 20))
 
-        self.settings_frame = ctk.CTkFrame(self.main_frame)
-        self.settings_frame.pack(fill="x", padx=20, pady=10)
+        self.settings_frame = ctk.CTkScrollableFrame(self.main_frame, fg_color="transparent")
+        self.settings_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
+        # Basic Settings
         ctk.CTkLabel(self.settings_frame, text="Username").pack(anchor="w", padx=20, pady=(15, 0))
         self.username_entry = ctk.CTkEntry(self.settings_frame)
         self.username_entry.pack(fill="x", padx=20, pady=(5, 10))
@@ -88,8 +89,17 @@ class OrbusLauncher(ctk.CTk):
 
         self.loader_ver_label = ctk.CTkLabel(self.settings_frame, text="Fabric Loader Version")
         self.loader_ver_combo = ctk.CTkComboBox(self.settings_frame, values=["latest"])
+
+        # --- NEW: RAM Slider ---
+        ctk.CTkLabel(self.settings_frame, text="RAM Allocation (GB)").pack(anchor="w", padx=20, pady=(10, 0))
+        self.ram_label = ctk.CTkLabel(self.settings_frame, text="4 GB", font=ctk.CTkFont(weight="bold"))
+        self.ram_label.pack(anchor="w", padx=20)
         
-        # --- NEW BUTTONS ---
+        self.ram_slider = ctk.CTkSlider(self.settings_frame, from_=2, to=12, number_of_steps=10, command=self.update_ram_label)
+        self.ram_slider.pack(fill="x", padx=20, pady=(5, 15))
+        self.ram_slider.set(4)
+
+        # Folder Buttons
         self.folder_btn = ctk.CTkButton(self.settings_frame, text="📂 Open Instance Folder", command=self.open_instance_folder, fg_color="gray30")
         self.folder_btn.pack(fill="x", padx=20, pady=(10, 5))
 
@@ -107,6 +117,9 @@ class OrbusLauncher(ctk.CTk):
         threading.Thread(target=self.load_fabric_versions_bg, daemon=True).start()
 
     # --- UI Logic ---
+    def update_ram_label(self, val):
+        self.ram_label.configure(text=f"{int(val)} GB")
+
     def load_config(self):
         if os.path.exists(CONFIG_FILE):
             try:
@@ -120,7 +133,8 @@ class OrbusLauncher(ctk.CTk):
                 "username": self.username_entry.get(),
                 "version": self.version_combo.get(),
                 "loader": self.loader_combo.get(),
-                "loader_version": self.loader_ver_combo.get()
+                "loader_version": self.loader_ver_combo.get(),
+                "ram": int(self.ram_slider.get()) # Save RAM
             }
         with open(CONFIG_FILE, 'w') as f: json.dump(self.instances, f, indent=4)
 
@@ -146,12 +160,6 @@ class OrbusLauncher(ctk.CTk):
             self.loader_ver_label.pack_forget()
             self.loader_ver_combo.pack_forget()
 
-    def refresh_instance_buttons(self):
-        for w in self.scrollable_list.winfo_children(): w.destroy()
-        for name in self.instances:
-            ctk.CTkButton(self.scrollable_list, text=name, fg_color="transparent", border_width=1, anchor="w", 
-                          command=lambda n=name: self.select_instance(n)).pack(fill="x", pady=2)
-
     def select_instance(self, name):
         if self.current_instance_name: self.save_config()
         self.current_instance_name = name
@@ -162,13 +170,24 @@ class OrbusLauncher(ctk.CTk):
         self.version_combo.set(d.get("version", "1.21.1"))
         self.loader_combo.set(d.get("loader", "Vanilla"))
         self.loader_ver_combo.set(d.get("loader_version", "latest"))
+        
+        ram_val = d.get("ram", 4)
+        self.ram_slider.set(ram_val)
+        self.update_ram_label(ram_val)
+        
         self.toggle_loader_settings(d.get("loader", "Vanilla"))
 
     def add_instance(self):
         n = simpledialog.askstring("New", "Instance Name:")
         if n and n not in self.instances:
-            self.instances[n] = {"username": "", "version": "1.21.1", "loader": "Vanilla", "loader_version": "latest"}
+            self.instances[n] = {"username": "", "version": "1.21.1", "loader": "Vanilla", "loader_version": "latest", "ram": 4}
             self.save_config(); self.refresh_instance_buttons(); self.select_instance(n)
+
+    def refresh_instance_buttons(self):
+        for w in self.scrollable_list.winfo_children(): w.destroy()
+        for name in self.instances:
+            ctk.CTkButton(self.scrollable_list, text=name, fg_color="transparent", border_width=1, anchor="w", 
+                          command=lambda n=name: self.select_instance(n)).pack(fill="x", pady=2)
 
     def delete_instance(self):
         if not self.current_instance_name: return
@@ -197,7 +216,7 @@ class OrbusLauncher(ctk.CTk):
         if sys.platform == "win32": os.startfile(path)
         else: subprocess.Popen(["xdg-open", path])
 
-    # --- MODPACK FIX: Extracting Overrides ---
+    # --- Modpack Logic ---
     def open_modrinth_search(self):
         self.search_win = ctk.CTkToplevel(self)
         self.search_win.title("Modrinth Browser")
@@ -218,7 +237,7 @@ class OrbusLauncher(ctk.CTk):
             try:
                 f = json.dumps([["project_type:modpack"], ["categories:fabric", "categories:quilt"]])
                 u = f"https://api.modrinth.com/v2/search?query={q}&facets={f}&limit=20"
-                d = requests.get(u, headers={"User-Agent": "Orbus/3.1"}).json()
+                d = requests.get(u, headers={"User-Agent": "Orbus/3.2"}).json()
                 for h in d.get("hits", []): self.after(0, lambda x=h: self.add_search_result(x))
             except: pass
         threading.Thread(target=run, daemon=True).start()
@@ -252,7 +271,8 @@ class OrbusLauncher(ctk.CTk):
                 if "modrinth.index.json" in z.namelist(): self.install_mrpack(z)
                 else: self.install_basic_zip(z, path)
             self.after(0, self.cleanup_installation)
-        except Exception as e: self.after(0, lambda: messagebox.showerror("Error", str(e)))
+        except Exception as e:
+            self.after(0, lambda: messagebox.showerror("Error", str(e)))
 
     def cleanup_installation(self):
         if self.progress_win: self.progress_win.destroy()
@@ -262,17 +282,15 @@ class OrbusLauncher(ctk.CTk):
         idx = json.loads(z.read("modrinth.index.json"))
         n = idx.get("name", "Pack"); d = idx["dependencies"]
         ldr = "Fabric" if "fabric-loader" in d else "Quilt" if "quilt-loader" in d else "Vanilla"
-        self.instances[n] = {"username": self.username_entry.get(), "version": d["minecraft"], "loader": ldr, "loader_version": "latest"}
+        self.instances[n] = {"username": self.username_entry.get(), "version": d["minecraft"], "loader": ldr, "loader_version": "latest", "ram": 4}
         self.save_config(); p = os.path.join(INSTANCES_DIR, n); os.makedirs(p, exist_ok=True)
         
-        # 1. Download Mods
         fs = idx.get("files", [])
         for i, f_o in enumerate(fs):
             self.after(0, lambda v=(i+1)/len(fs): self.prog_bar.set(v))
             dst = os.path.join(p, f_o["path"]); os.makedirs(os.path.dirname(dst), exist_ok=True)
             with open(dst, "wb") as f: f.write(requests.get(f_o["downloads"][0]).content)
         
-        # 2. Extract Overrides (This is where CONFIGS are hidden!)
         for file in z.namelist():
             if file.startswith("overrides/"):
                 rel_path = file.replace("overrides/", "")
@@ -285,7 +303,7 @@ class OrbusLauncher(ctk.CTk):
 
     def install_basic_zip(self, z, p_orig):
         n = os.path.splitext(os.path.basename(p_orig))[0]
-        self.instances[n] = {"username": "", "version": "1.21.1", "loader": "Vanilla", "loader_version": "latest"}
+        self.instances[n] = {"username": "", "version": "1.21.1", "loader": "Vanilla", "loader_version": "latest", "ram": 4}
         self.save_config(); p = os.path.join(INSTANCES_DIR, n); os.makedirs(p, exist_ok=True)
         z.extractall(p)
 
@@ -308,14 +326,12 @@ class OrbusLauncher(ctk.CTk):
             target = self.current_instance_name
             d = self.instances[target].copy()
             v, loader, user = d.get("version"), d.get("loader", "Vanilla"), d.get("username")
-            l_ver = d.get("loader_version", "latest")
+            l_ver, ram = d.get("loader_version", "latest"), d.get("ram", 4)
             
             if not v or not user: raise Exception("Version or Username missing.")
 
             inst_dir = os.path.abspath(os.path.join(INSTANCES_DIR, target))
             os.makedirs(inst_dir, exist_ok=True)
-            # Create config dir if missing
-            os.makedirs(os.path.join(inst_dir, "config"), exist_ok=True)
 
             def set_st(t): self.after(0, lambda: self.status_label.configure(text=t))
             set_st(f"Preparing {target}...")
@@ -336,11 +352,21 @@ class OrbusLauncher(ctk.CTk):
 
             set_st("Checking files...")
             java = shutil.which("javaw") or shutil.which("java") or "java"
-            opts = {"username": user, "uuid": "0", "token": "0", "gameDir": inst_dir, "executablePath": java}
+            
+            # --- RAM INJECTION ---
+            jvm_args = [f"-Xmx{ram}G", f"-Xms{ram}G", "-XX:+UseG1GC"]
+            
+            opts = {
+                "username": user, 
+                "uuid": "0", 
+                "token": "0", 
+                "gameDir": inst_dir, 
+                "executablePath": java,
+                "jvmArguments": jvm_args # Add memory limits here
+            }
             
             cmd = minecraft_launcher_lib.command.get_minecraft_command(l_id, MINECRAFT_DIR, opts)
             
-            # STRENGTHENED GameDir Enforcement
             if "--gameDir" not in cmd: cmd.extend(["--gameDir", inst_dir])
             else:
                 for i, arg in enumerate(cmd):
@@ -352,7 +378,6 @@ class OrbusLauncher(ctk.CTk):
             log_text = ctk.CTkTextbox(log_win, font=("Courier New", 12))
             log_text.pack(expand=True, fill="both", padx=10, pady=10)
 
-            # Important: set cwd to inst_dir so the game looks there first
             process = subprocess.Popen(cmd, cwd=inst_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
 
             def stream_logs():
