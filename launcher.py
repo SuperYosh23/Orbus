@@ -31,16 +31,29 @@ ICON_URL = "https://github.com/SuperYosh23/Orbus/blob/main/icon.png?raw=true"
 
 os.makedirs(INSTANCES_DIR, exist_ok=True)
 
+class LogWindow(ctk.CTkToplevel):
+    def __init__(self, master):
+        super().__init__(master)
+        self.title("Minecraft Console Logs")
+        self.geometry("900x500")
+
+        self.textbox = ctk.CTkTextbox(self, font=("Consolas", 12))
+        self.textbox.pack(fill="both", expand=True, padx=10, pady=10)
+
+    def log(self, text):
+        self.textbox.insert("end", text)
+        self.textbox.see("end")
+
 class OrbusLauncher(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Orbus Launcher")
-        self.geometry("1000x850") # Slightly taller for extra settings
+        self.geometry("1000x850")
 
         self.instances = self.load_config()
         self.current_instance_name = None
-        self.progress_win = None 
-        self.tk_icon = None 
+        self.progress_win = None
+        self.tk_icon = None
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -54,7 +67,7 @@ class OrbusLauncher(ctk.CTk):
         self.logo_label.grid(row=0, column=0, pady=(20, 5))
 
         ctk.CTkLabel(self.sidebar_frame, text="ORBUS", font=ctk.CTkFont(size=26, weight="bold")).grid(row=1, column=0, pady=(0, 20))
-        
+
         self.browse_btn = ctk.CTkButton(self.sidebar_frame, text="🌐 Browse Modrinth", fg_color="#1bd964", hover_color="#15a34a", text_color="black", font=ctk.CTkFont(weight="bold"), command=self.open_modrinth_search)
         self.browse_btn.grid(row=2, column=0, padx=20, pady=10)
 
@@ -63,7 +76,7 @@ class OrbusLauncher(ctk.CTk):
 
         self.add_btn = ctk.CTkButton(self.sidebar_frame, text="+ New Instance", command=self.add_instance, fg_color="gray25")
         self.add_btn.grid(row=4, column=0, padx=20, pady=5)
-        
+
         self.import_btn = ctk.CTkButton(self.sidebar_frame, text="📥 Import .zip/.mrpack", command=self.import_modpack, fg_color="gray25")
         self.import_btn.grid(row=5, column=0, padx=20, pady=5)
 
@@ -80,7 +93,7 @@ class OrbusLauncher(ctk.CTk):
         self.settings_frame = ctk.CTkScrollableFrame(self.main_frame, fg_color="transparent")
         self.settings_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
-        # Instance Name / Header (Hidden usually)
+        # Instance Name / Header
         ctk.CTkLabel(self.settings_frame, text="Username").pack(anchor="w", padx=20, pady=(15, 0))
         self.username_entry = ctk.CTkEntry(self.settings_frame)
         self.username_entry.pack(fill="x", padx=20, pady=(5, 10))
@@ -112,6 +125,12 @@ class OrbusLauncher(ctk.CTk):
         self.ram_slider.pack(fill="x", padx=20, pady=(5, 15))
         self.ram_slider.set(4)
 
+        # -- LOGS CHECKBOX --
+        self.show_logs_var = ctk.BooleanVar(value=False)
+        self.logs_chk = ctk.CTkCheckBox(self.settings_frame, text="Show Console Logs", variable=self.show_logs_var)
+        self.logs_chk.pack(anchor="w", padx=20, pady=(10, 5))
+        # -------------------
+
         self.folder_btn = ctk.CTkButton(self.settings_frame, text="📂 Open Instance Folder", command=self.open_instance_folder, fg_color="gray30")
         self.folder_btn.pack(fill="x", padx=20, pady=(10, 5))
 
@@ -125,7 +144,7 @@ class OrbusLauncher(ctk.CTk):
         self.launch_btn.pack(side="bottom", fill="x", padx=20, pady=10)
 
         self.refresh_instance_buttons()
-        
+
         # Start background tasks
         threading.Thread(target=self.download_icon_bg, daemon=True).start()
         threading.Thread(target=self.load_versions_bg, daemon=True).start()
@@ -156,8 +175,8 @@ class OrbusLauncher(ctk.CTk):
 
     def reload_sidebar_logo(self):
         try:
-            logo_img = ctk.CTkImage(light_image=Image.open(ICON_PATH), 
-                                  dark_image=Image.open(ICON_PATH), 
+            logo_img = ctk.CTkImage(light_image=Image.open(ICON_PATH),
+                                  dark_image=Image.open(ICON_PATH),
                                   size=(60, 60))
             self.logo_label.configure(image=logo_img, text="")
         except: pass
@@ -165,7 +184,7 @@ class OrbusLauncher(ctk.CTk):
     # --- UI Logic ---
     def browse_java_path(self):
         filename = filedialog.askopenfilename(title="Select Java Executable",
-                                              filetypes=[("Java Executable", "java javaw java.exe javaw.exe"), ("All Files", "*.*")])
+                                            filetypes=[("Java Executable", "java javaw java.exe javaw.exe"), ("All Files", "*.*")])
         if filename:
             self.java_entry.delete(0, 'end')
             self.java_entry.insert(0, filename)
@@ -217,7 +236,7 @@ class OrbusLauncher(ctk.CTk):
     def refresh_instance_buttons(self):
         for w in self.scrollable_list.winfo_children(): w.destroy()
         for name in self.instances:
-            ctk.CTkButton(self.scrollable_list, text=name, fg_color="transparent", border_width=1, anchor="w", 
+            ctk.CTkButton(self.scrollable_list, text=name, fg_color="transparent", border_width=1, anchor="w",
                           command=lambda n=name: self.select_instance(n)).pack(fill="x", pady=2)
 
     def select_instance(self, name):
@@ -232,10 +251,10 @@ class OrbusLauncher(ctk.CTk):
         self.loader_ver_combo.set(d.get("loader_version", "latest"))
         self.ram_slider.set(d.get("ram", 4))
         self.update_ram_label(self.ram_slider.get())
-        
+
         self.java_entry.delete(0, 'end')
         self.java_entry.insert(0, d.get("java_path", ""))
-        
+
         self.toggle_loader_settings(d.get("loader", "Vanilla"))
 
     def add_instance(self):
@@ -335,13 +354,13 @@ class OrbusLauncher(ctk.CTk):
         ldr = "Fabric" if "fabric-loader" in d else "Quilt" if "quilt-loader" in d else "Vanilla"
         self.instances[n] = {"username": self.username_entry.get(), "version": d["minecraft"], "loader": ldr, "loader_version": "latest", "ram": 4, "java_path": ""}
         self.save_config(); p = os.path.join(INSTANCES_DIR, n); os.makedirs(p, exist_ok=True)
-        
+
         fs = idx.get("files", [])
         for i, f_o in enumerate(fs):
             self.after(0, lambda v=(i+1)/len(fs): self.prog_bar.set(v))
             dst = os.path.join(p, f_o["path"]); os.makedirs(os.path.dirname(dst), exist_ok=True)
             with open(dst, "wb") as f: f.write(requests.get(f_o["downloads"][0]).content)
-        
+
         for file in z.namelist():
             if file.startswith("overrides/"):
                 rel_path = file.replace("overrides/", "")
@@ -378,7 +397,7 @@ class OrbusLauncher(ctk.CTk):
             v, loader, user = d.get("version"), d.get("loader", "Vanilla"), d.get("username")
             l_ver, ram = d.get("loader_version", "latest"), d.get("ram", 4)
             custom_java = d.get("java_path", "").strip()
-            
+
             if not v or not user: raise Exception("Version or Username missing.")
 
             inst_dir = os.path.abspath(os.path.join(INSTANCES_DIR, target))
@@ -402,32 +421,52 @@ class OrbusLauncher(ctk.CTk):
                 l_id = f"quilt-loader-{v}"
 
             set_st("Launching...")
-            
+
             # Determine which Java to use
             if custom_java and os.path.exists(custom_java):
                 java = custom_java
             else:
                 java = shutil.which("javaw") or shutil.which("java") or "java"
-                
+
             jvm_args = [f"-Xmx{ram}G", f"-Xms{ram}G", "-XX:+UseG1GC"]
-            
+
             opts = {"username": user, "uuid": "0", "token": "0", "gameDir": inst_dir, "executablePath": java, "jvmArguments": jvm_args}
             cmd = minecraft_launcher_lib.command.get_minecraft_command(l_id, MINECRAFT_DIR, opts)
-            
+
             if "--gameDir" not in cmd: cmd.extend(["--gameDir", inst_dir])
             else:
                 for i, arg in enumerate(cmd):
                     if arg == "--gameDir": cmd[i+1] = inst_dir
 
+            # Launch process with stdout captured
             process = subprocess.Popen(cmd, cwd=inst_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+
+            # --- LOG WINDOW LOGIC ---
+            log_win = None
+            if self.show_logs_var.get():
+                log_win = LogWindow(self)
+
             self.withdraw()
-            
+
+            def stream_reader():
+                # Read stdout line by line
+                for line in iter(process.stdout.readline, ""):
+                    if log_win and log_win.winfo_exists():
+                        self.after(0, lambda l=line: log_win.log(l))
+                process.stdout.close()
+
+            threading.Thread(target=stream_reader, daemon=True).start()
+
             def check_alive():
-                if process.poll() is None: self.after(1000, check_alive)
+                if process.poll() is None:
+                    self.after(1000, check_alive)
                 else:
+                    if log_win and log_win.winfo_exists():
+                        log_win.destroy()
                     self.after(0, self.deiconify)
                     self.after(0, lambda: self.launch_btn.configure(state="normal", text="LAUNCH GAME"))
                     self.after(0, lambda: self.status_label.configure(text="Ready"))
+
             check_alive()
         except Exception as e:
             self.after(0, lambda: messagebox.showerror("Launch Error", str(e)))
