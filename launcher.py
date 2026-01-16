@@ -163,7 +163,6 @@ class OrbusLauncher(ctk.CTk):
             if sys.platform == "win32": os.startfile(p)
             else: subprocess.Popen(["xdg-open", p])
 
-    # --- Modrinth/Import ---
     def open_modrinth_search(self):
         self.search_win = ctk.CTkToplevel(self)
         self.search_win.title("Modrinth Browser")
@@ -185,7 +184,7 @@ class OrbusLauncher(ctk.CTk):
             try:
                 facets = json.dumps([["project_type:modpack"], ["categories:fabric", "categories:quilt"]])
                 url = f"https://api.modrinth.com/v2/search?query={query}&facets={facets}&limit=20"
-                data = requests.get(url, headers={"User-Agent": "Orbus/2.7"}).json()
+                data = requests.get(url, headers={"User-Agent": "Orbus/2.8"}).json()
                 for hit in data.get("hits", []):
                     self.after(0, lambda h=hit: self.add_search_result(h))
             except: pass
@@ -220,7 +219,8 @@ class OrbusLauncher(ctk.CTk):
                 if "modrinth.index.json" in z.namelist(): self.install_mrpack(z)
                 else: self.install_basic_zip(z, path)
             self.after(0, self.cleanup_installation)
-        except Exception as e: self.after(0, lambda: messagebox.showerror("Error", str(e)))
+        except Exception as e:
+            self.after(0, lambda: messagebox.showerror("Error", str(e)))
 
     def cleanup_installation(self):
         if self.progress_win: self.progress_win.destroy()
@@ -250,7 +250,7 @@ class OrbusLauncher(ctk.CTk):
         ctk.CTkLabel(self.progress_win, text=txt).pack(pady=20)
         self.prog_bar = ctk.CTkProgressBar(self.progress_win, width=300); self.prog_bar.pack(); self.prog_bar.set(0)
 
-    # --- THE LAUNCH FIX (NONE-TYPE PROTECTION) ---
+    # --- THE LAUNCHER LOGIC ---
     def start_launch_thread(self):
         if self.current_instance_name:
             self.save_config()
@@ -264,9 +264,8 @@ class OrbusLauncher(ctk.CTk):
             d = self.instances[target].copy()
             v, loader, user = d.get("version"), d.get("loader", "Vanilla"), d.get("username")
             
-            # 1. Validation to prevent NoneType paths
             if not v or not user:
-                raise Exception("Version or Username is missing. Please select them first.")
+                raise Exception("Version or Username is missing.")
 
             inst_dir = os.path.abspath(os.path.join(INSTANCES_DIR, target))
             os.makedirs(inst_dir, exist_ok=True)
@@ -274,56 +273,78 @@ class OrbusLauncher(ctk.CTk):
             def set_st(t): self.after(0, lambda: self.status_label.configure(text=t))
             set_st(f"Preparing {target}...")
 
-            # 2. Hard-install base version
             minecraft_launcher_lib.install.install_minecraft_version(v, MINECRAFT_DIR, callback={'setStatus': set_st})
 
-            # 3. Secure Launch ID Generation
-            l_id = str(v) # Default to base version string
+            l_id = str(v)
             if loader == "Fabric":
                 set_st("Installing Fabric...")
-                try:
-                    # Attempt automated install
-                    installed_id = minecraft_launcher_lib.fabric.install_fabric(v, MINECRAFT_DIR)
-                    if installed_id:
-                        l_id = installed_id
-                    else:
-                        # FALLBACK: Build ID manually if lib returns None
-                        meta = requests.get("https://meta.fabricmc.net/v2/versions/loader").json()
-                        latest_loader = meta[0]["version"]
-                        minecraft_launcher_lib.fabric.install_fabric(v, MINECRAFT_DIR, loader_version=latest_loader)
-                        l_id = f"fabric-loader-{latest_loader}-{v}"
-                except Exception as fab_err:
-                    print(f"Fabric error fallback: {fab_err}")
-
+                installed_id = minecraft_launcher_lib.fabric.install_fabric(v, MINECRAFT_DIR)
+                l_id = installed_id if installed_id else v
             elif loader == "Quilt":
                 set_st("Installing Quilt...")
                 installed_id = minecraft_launcher_lib.quilt.install_quilt(v, MINECRAFT_DIR)
-                if installed_id: l_id = installed_id
+                l_id = installed_id if installed_id else v
 
-            # FINAL SAFETY CHECK: Ensure l_id is a string, never None
-            if not l_id or not isinstance(l_id, str):
-                l_id = str(v) 
-
-            # 4. Final Command Injection
             set_st("Launching Process...")
             java = shutil.which("javaw") or shutil.which("java") or "java"
             opts = {"username": user, "uuid": "0", "token": "0", "gameDir": inst_dir, "executablePath": java}
             
             cmd = minecraft_launcher_lib.command.get_minecraft_command(l_id, MINECRAFT_DIR, opts)
             
-            # Ensure the --gameDir argument points to our specific instance
             if "--gameDir" not in cmd:
                 cmd.extend(["--gameDir", inst_dir])
             else:
                 for i, arg in enumerate(cmd):
                     if arg == "--gameDir": cmd[i+1] = inst_dir
+
+            # --- LOG WINDOW SETUP ---
+            log_win = ctk.CTkToplevel(self)
+            log_win.title(f"Logs - {target}")
+            log_win.geometry("800x400")
             
-            subprocess.Popen(cmd, cwd=inst_dir)
-            self.after(2000, self.destroy)
+            log_text = ctk.CTkTextbox(log_win, font=("Courier New", 12))
+            log_text.pack(expand=True, fill="both", padx=10, pady=10)
+
+            # Start the game process
+            process = subprocess.Popen(
+                cmd, 
+                cwd=inst_dir, 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.STDOUT, 
+                text=True,
+                bufsize=1
+            )
+
+            # Thread to pipe stdout to the textbox
+            def stream_logs():
+                for line in iter(process.stdout.readline, ""):
+                    if line:
+                        self.after(0, lambda l=line: self.append_log(log_text, l))
+                process.stdout.close()
+
+            threading.Thread(target=stream_logs, daemon=True).start()
+            
+            # Hide the main launcher window
+            self.withdraw()
+            
+            # Check if game closed to bring back launcher
+            def check_alive():
+                if process.poll() is None:
+                    self.after(1000, check_alive)
+                else:
+                    self.after(0, self.deiconify)
+                    self.after(0, lambda: self.launch_btn.configure(state="normal", text="LAUNCH GAME"))
+                    self.after(0, lambda: self.status_label.configure(text="Ready"))
+
+            check_alive()
 
         except Exception as e:
-            self.after(0, lambda: messagebox.showerror("Launch Error", f"Critical Failure: {str(e)}"))
+            self.after(0, lambda: messagebox.showerror("Launch Error", f"Failure: {str(e)}"))
             self.after(0, lambda: self.launch_btn.configure(state="normal", text="LAUNCH GAME"))
+
+    def append_log(self, widget, line):
+        widget.insert("end", line)
+        widget.see("end")
 
 if __name__ == "__main__":
     app = OrbusLauncher(); app.mainloop()
