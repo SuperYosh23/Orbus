@@ -35,12 +35,12 @@ class OrbusLauncher(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Orbus Launcher")
-        self.geometry("1000x800")
+        self.geometry("1000x850") # Slightly taller for extra settings
 
         self.instances = self.load_config()
         self.current_instance_name = None
         self.progress_win = None 
-        self.tk_icon = None # Keep reference to prevent garbage collection
+        self.tk_icon = None 
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -50,7 +50,6 @@ class OrbusLauncher(ctk.CTk):
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
         self.sidebar_frame.grid_rowconfigure(3, weight=1)
 
-        # Branding Logo (will refresh after download)
         self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="O", font=ctk.CTkFont(size=32, weight="bold"))
         self.logo_label.grid(row=0, column=0, pady=(20, 5))
 
@@ -81,7 +80,7 @@ class OrbusLauncher(ctk.CTk):
         self.settings_frame = ctk.CTkScrollableFrame(self.main_frame, fg_color="transparent")
         self.settings_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
-        # Settings
+        # Instance Name / Header (Hidden usually)
         ctk.CTkLabel(self.settings_frame, text="Username").pack(anchor="w", padx=20, pady=(15, 0))
         self.username_entry = ctk.CTkEntry(self.settings_frame)
         self.username_entry.pack(fill="x", padx=20, pady=(5, 10))
@@ -96,6 +95,15 @@ class OrbusLauncher(ctk.CTk):
 
         self.loader_ver_label = ctk.CTkLabel(self.settings_frame, text="Fabric Loader Version")
         self.loader_ver_combo = ctk.CTkComboBox(self.settings_frame, values=["latest"])
+
+        # Java Executable Setting
+        ctk.CTkLabel(self.settings_frame, text="Java Executable (Leave empty for default)").pack(anchor="w", padx=20, pady=(10, 0))
+        self.java_frame = ctk.CTkFrame(self.settings_frame, fg_color="transparent")
+        self.java_frame.pack(fill="x", padx=20, pady=(5, 10))
+        self.java_entry = ctk.CTkEntry(self.java_frame, placeholder_text="Default: java/javaw")
+        self.java_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        self.java_browse_btn = ctk.CTkButton(self.java_frame, text="Browse", width=80, command=self.browse_java_path)
+        self.java_browse_btn.pack(side="right")
 
         ctk.CTkLabel(self.settings_frame, text="RAM Allocation (GB)").pack(anchor="w", padx=20, pady=(10, 0))
         self.ram_label = ctk.CTkLabel(self.settings_frame, text="4 GB", font=ctk.CTkFont(weight="bold"))
@@ -155,6 +163,13 @@ class OrbusLauncher(ctk.CTk):
         except: pass
 
     # --- UI Logic ---
+    def browse_java_path(self):
+        filename = filedialog.askopenfilename(title="Select Java Executable",
+                                              filetypes=[("Java Executable", "java javaw java.exe javaw.exe"), ("All Files", "*.*")])
+        if filename:
+            self.java_entry.delete(0, 'end')
+            self.java_entry.insert(0, filename)
+
     def update_ram_label(self, val):
         self.ram_label.configure(text=f"{int(val)} GB")
 
@@ -172,7 +187,8 @@ class OrbusLauncher(ctk.CTk):
                 "version": self.version_combo.get(),
                 "loader": self.loader_combo.get(),
                 "loader_version": self.loader_ver_combo.get(),
-                "ram": int(self.ram_slider.get())
+                "ram": int(self.ram_slider.get()),
+                "java_path": self.java_entry.get()
             })
         with open(CONFIG_FILE, 'w') as f: json.dump(self.instances, f, indent=4)
 
@@ -216,12 +232,16 @@ class OrbusLauncher(ctk.CTk):
         self.loader_ver_combo.set(d.get("loader_version", "latest"))
         self.ram_slider.set(d.get("ram", 4))
         self.update_ram_label(self.ram_slider.get())
+        
+        self.java_entry.delete(0, 'end')
+        self.java_entry.insert(0, d.get("java_path", ""))
+        
         self.toggle_loader_settings(d.get("loader", "Vanilla"))
 
     def add_instance(self):
         n = simpledialog.askstring("New", "Instance Name:")
         if n and n not in self.instances:
-            self.instances[n] = {"username": "", "version": "1.21.1", "loader": "Vanilla", "loader_version": "latest", "ram": 4}
+            self.instances[n] = {"username": "", "version": "1.21.1", "loader": "Vanilla", "loader_version": "latest", "ram": 4, "java_path": ""}
             self.save_config(); self.refresh_instance_buttons(); self.select_instance(n)
 
     def delete_instance(self):
@@ -313,7 +333,7 @@ class OrbusLauncher(ctk.CTk):
         idx = json.loads(z.read("modrinth.index.json"))
         n = idx.get("name", "Pack"); d = idx["dependencies"]
         ldr = "Fabric" if "fabric-loader" in d else "Quilt" if "quilt-loader" in d else "Vanilla"
-        self.instances[n] = {"username": self.username_entry.get(), "version": d["minecraft"], "loader": ldr, "loader_version": "latest", "ram": 4}
+        self.instances[n] = {"username": self.username_entry.get(), "version": d["minecraft"], "loader": ldr, "loader_version": "latest", "ram": 4, "java_path": ""}
         self.save_config(); p = os.path.join(INSTANCES_DIR, n); os.makedirs(p, exist_ok=True)
         
         fs = idx.get("files", [])
@@ -334,7 +354,7 @@ class OrbusLauncher(ctk.CTk):
 
     def install_basic_zip(self, z, p_orig):
         n = os.path.splitext(os.path.basename(p_orig))[0]
-        self.instances[n] = {"username": "", "version": "1.21.1", "loader": "Vanilla", "loader_version": "latest", "ram": 4}
+        self.instances[n] = {"username": "", "version": "1.21.1", "loader": "Vanilla", "loader_version": "latest", "ram": 4, "java_path": ""}
         self.save_config(); p = os.path.join(INSTANCES_DIR, n); os.makedirs(p, exist_ok=True)
         z.extractall(p)
 
@@ -357,6 +377,7 @@ class OrbusLauncher(ctk.CTk):
             d = self.instances[target].copy()
             v, loader, user = d.get("version"), d.get("loader", "Vanilla"), d.get("username")
             l_ver, ram = d.get("loader_version", "latest"), d.get("ram", 4)
+            custom_java = d.get("java_path", "").strip()
             
             if not v or not user: raise Exception("Version or Username missing.")
 
@@ -381,7 +402,13 @@ class OrbusLauncher(ctk.CTk):
                 l_id = f"quilt-loader-{v}"
 
             set_st("Launching...")
-            java = shutil.which("javaw") or shutil.which("java") or "java"
+            
+            # Determine which Java to use
+            if custom_java and os.path.exists(custom_java):
+                java = custom_java
+            else:
+                java = shutil.which("javaw") or shutil.which("java") or "java"
+                
             jvm_args = [f"-Xmx{ram}G", f"-Xms{ram}G", "-XX:+UseG1GC"]
             
             opts = {"username": user, "uuid": "0", "token": "0", "gameDir": inst_dir, "executablePath": java, "jvmArguments": jvm_args}
