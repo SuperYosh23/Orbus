@@ -7,6 +7,7 @@ import shutil
 import zipfile
 import requests
 import io
+import re  # Added for parsing Java version strings
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, simpledialog
 from PIL import Image, ImageTk
@@ -32,7 +33,72 @@ ICON_URL = "https://github.com/SuperYosh23/Orbus/blob/main/icon.png?raw=true"
 os.makedirs(INSTANCES_DIR, exist_ok=True)
 
 # -------------------------
-# Custom Scrollable Dropdown Widget (FIXED SCROLL & SEARCH)
+# Helper Function: Java Scanner
+# -------------------------
+def find_system_javas():
+    """Scans common directories and PATH for Java installations."""
+    java_paths = set()
+
+    # 1. Check JAVA_HOME
+    if os.environ.get("JAVA_HOME"):
+        java_paths.add(os.path.join(os.environ["JAVA_HOME"], "bin", "javaw.exe" if sys.platform == "win32" else "java"))
+
+    # 2. Check PATH
+    path_java = shutil.which("javaw") or shutil.which("java")
+    if path_java:
+        java_paths.add(os.path.abspath(path_java))
+
+    # 3. Check Common Directories
+    search_dirs = []
+    if sys.platform == "win32":
+        search_dirs = [
+            r"C:\Program Files\Java",
+            r"C:\Program Files (x86)\Java",
+            r"C:\Program Files\Eclipse Adoptium",
+            r"C:\Program Files\Microsoft",
+            r"C:\Program Files\BellSoft",
+            r"C:\Program Files\Azul Systems"
+        ]
+    elif sys.platform == "linux" or sys.platform == "linux2":
+        search_dirs = ["/usr/lib/jvm", "/opt"]
+    elif sys.platform == "darwin": # MacOS
+        search_dirs = ["/Library/Java/JavaVirtualMachines"]
+
+    for root_dir in search_dirs:
+        if os.path.exists(root_dir):
+            for dirpath, _, filenames in os.walk(root_dir):
+                # Don't go too deep to save time
+                if dirpath.count(os.sep) - root_dir.count(os.sep) > 3: continue
+
+                target = "javaw.exe" if sys.platform == "win32" else "java"
+                if target in filenames:
+                    java_paths.add(os.path.abspath(os.path.join(dirpath, target)))
+
+    # 4. Filter and Get Versions
+    results = []
+    for path in java_paths:
+        if not os.path.exists(path): continue
+        try:
+            # Run java -version to get the version string
+            proc = subprocess.run([path, "-version"], capture_output=True, text=True, timeout=2)
+            output = proc.stderr # Java version usually prints to stderr
+
+            # Parse version (e.g., "1.8.0_321" or "17.0.1")
+            version_match = re.search(r'version "([^"]+)"', output)
+            version_str = version_match.group(1) if version_match else "Unknown Version"
+
+            # Identify Arch (64-bit vs 32-bit)
+            arch = "64-bit" if "64-Bit" in output else "32-bit"
+
+            results.append({"path": path, "version": version_str, "arch": arch})
+        except:
+            continue
+
+    # Sort by version (descending roughly)
+    return sorted(results, key=lambda x: x['version'], reverse=True)
+
+# -------------------------
+# Custom Scrollable Dropdown Widget
 # -------------------------
 class ScrollableComboBox(ctk.CTkFrame):
     def __init__(self, master, width=200, height=30, values=[], command=None, **kwargs):
@@ -77,7 +143,6 @@ class ScrollableComboBox(ctk.CTkFrame):
         self.search_entry = ctk.CTkEntry(self.dropdown_window, placeholder_text="Type to search...", textvariable=self.search_var)
         self.search_entry.pack(fill="x", padx=5, pady=5)
 
-        # Force focus to search bar
         self.search_entry.focus_set()
 
         # Scrollable List
@@ -86,7 +151,6 @@ class ScrollableComboBox(ctk.CTkFrame):
 
         self.populate_options(self.values)
 
-        # Click outside to close
         self.dropdown_window.bind("<FocusOut>", self._on_focus_out)
 
     def _on_focus_out(self, event):
@@ -99,7 +163,6 @@ class ScrollableComboBox(ctk.CTkFrame):
             self.close_dropdown()
 
     def populate_options(self, options):
-        # Clear existing buttons
         for widget in self.scroll_frame.winfo_children():
             widget.destroy()
 
@@ -113,23 +176,15 @@ class ScrollableComboBox(ctk.CTkFrame):
                                     height=24,
                                     command=lambda v=val: self.select_option(v))
                 btn.pack(fill="x", pady=1)
-
-                # Bind scroll wheel to individual buttons
                 self._bind_mouse_scroll(btn)
 
-        # Bind scroll to frame
         self._bind_mouse_scroll(self.scroll_frame)
         self._bind_mouse_scroll(self.scroll_frame._parent_canvas)
-
-        # --- KEY FIX: Reset Scroll Position to Top ---
-        # This ensures search results are always visible immediately
         self.scroll_frame._parent_canvas.yview_moveto(0.0)
 
     def _bind_mouse_scroll(self, widget):
-        # Linux (Steam Deck)
         widget.bind("<Button-4>", lambda e: self.scroll_frame._parent_canvas.yview_scroll(-1, "units"))
         widget.bind("<Button-5>", lambda e: self.scroll_frame._parent_canvas.yview_scroll(1, "units"))
-        # Windows/Mac
         widget.bind("<MouseWheel>", lambda e: self.scroll_frame._parent_canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
     def filter_options(self, *args):
@@ -160,7 +215,6 @@ class ScrollableComboBox(ctk.CTkFrame):
     def configure(self, values=None):
         if values is not None:
             self.values = values
-            # Update selected value if it's not in the new list (optional safety)
             if self.selected_value not in values and values:
                 self.selected_value = values[0]
                 self.main_button.configure(text=self.selected_value)
@@ -249,13 +303,22 @@ class OrbusLauncher(ctk.CTk):
         self.loader_ver_combo = ScrollableComboBox(self.settings_frame, values=["latest"])
         # -------------------------
 
+        # --- JAVA SELECTION (MODIFIED) ---
         ctk.CTkLabel(self.settings_frame, text="Java Executable (Leave empty for default)").pack(anchor="w", padx=20, pady=(10, 0))
         self.java_frame = ctk.CTkFrame(self.settings_frame, fg_color="transparent")
         self.java_frame.pack(fill="x", padx=20, pady=(5, 10))
+
         self.java_entry = ctk.CTkEntry(self.java_frame, placeholder_text="Default: java/javaw")
         self.java_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+
+        # New Auto Detect Button
+        self.java_auto_btn = ctk.CTkButton(self.java_frame, text="Auto Detect", width=80,
+                                           fg_color="#3B8ED0", command=self.open_java_detector)
+        self.java_auto_btn.pack(side="right", padx=(5, 0))
+
         self.java_browse_btn = ctk.CTkButton(self.java_frame, text="Browse", width=80, command=self.browse_java_path)
         self.java_browse_btn.pack(side="right")
+        # -------------------------
 
         ctk.CTkLabel(self.settings_frame, text="RAM Allocation (GB)").pack(anchor="w", padx=20, pady=(10, 0))
         self.ram_label = ctk.CTkLabel(self.settings_frame, text="4 GB", font=ctk.CTkFont(weight="bold"))
@@ -595,6 +658,64 @@ class OrbusLauncher(ctk.CTk):
         except Exception as e:
             self.after(0, lambda: messagebox.showerror("Launch Error", str(e)))
             self.after(0, lambda: self.launch_btn.configure(state="normal", text="LAUNCH GAME"))
+
+    # --- New Methods for Java Detection ---
+    def open_java_detector(self):
+        self.detect_win = ctk.CTkToplevel(self)
+        self.detect_win.title("Java Auto-Detect")
+        self.detect_win.geometry("600x400")
+        self.detect_win.attributes('-topmost', True)
+
+        self.detect_status = ctk.CTkLabel(self.detect_win, text="Scanning system for Java...", font=ctk.CTkFont(size=16))
+        self.detect_status.pack(pady=20)
+
+        self.detect_progress = ctk.CTkProgressBar(self.detect_win)
+        self.detect_progress.pack(pady=10)
+        self.detect_progress.set(0)
+        self.detect_progress.start()
+
+        self.detect_scroll = ctk.CTkScrollableFrame(self.detect_win, label_text="Found Installations")
+
+        threading.Thread(target=self.run_java_scan_thread, daemon=True).start()
+
+    def run_java_scan_thread(self):
+        found_javas = find_system_javas()
+        self.after(0, lambda: self.display_java_results(found_javas))
+
+    def display_java_results(self, javas):
+        if not self.detect_win.winfo_exists(): return
+
+        self.detect_progress.stop()
+        self.detect_progress.pack_forget()
+        self.detect_status.configure(text=f"Found {len(javas)} Java versions")
+        self.detect_scroll.pack(fill="both", expand=True, padx=20, pady=20)
+
+        for widget in self.detect_scroll.winfo_children(): widget.destroy()
+
+        if not javas:
+            ctk.CTkLabel(self.detect_scroll, text="No Java installations found.").pack(pady=10)
+            return
+
+        for j in javas:
+            card = ctk.CTkFrame(self.detect_scroll)
+            card.pack(fill="x", pady=5)
+
+            info_text = f"Java {j['version']} ({j['arch']})"
+            lbl = ctk.CTkLabel(card, text=info_text, font=ctk.CTkFont(weight="bold"))
+            lbl.pack(side="left", padx=10, pady=5)
+
+            path_lbl = ctk.CTkLabel(card, text=j['path'], text_color="gray", font=ctk.CTkFont(size=10))
+            path_lbl.pack(side="left", padx=10)
+
+            btn = ctk.CTkButton(card, text="Select", width=60,
+                                command=lambda p=j['path']: self.apply_detected_java(p))
+            btn.pack(side="right", padx=10, pady=5)
+
+    def apply_detected_java(self, path):
+        self.java_entry.delete(0, 'end')
+        self.java_entry.insert(0, path)
+        self.detect_win.destroy()
+        self.save_config()
 
 if __name__ == "__main__":
     app = OrbusLauncher(); app.mainloop()
