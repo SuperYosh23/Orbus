@@ -176,15 +176,15 @@ class OrbusLauncher(ctk.CTk):
     def reload_sidebar_logo(self):
         try:
             logo_img = ctk.CTkImage(light_image=Image.open(ICON_PATH),
-                                  dark_image=Image.open(ICON_PATH),
-                                  size=(60, 60))
+                                    dark_image=Image.open(ICON_PATH),
+                                    size=(60, 60))
             self.logo_label.configure(image=logo_img, text="")
         except: pass
 
     # --- UI Logic ---
     def browse_java_path(self):
         filename = filedialog.askopenfilename(title="Select Java Executable",
-                                            filetypes=[("Java Executable", "java javaw java.exe javaw.exe"), ("All Files", "*.*")])
+                                              filetypes=[("Java Executable", "java javaw java.exe javaw.exe"), ("All Files", "*.*")])
         if filename:
             self.java_entry.delete(0, 'end')
             self.java_entry.insert(0, filename)
@@ -313,12 +313,49 @@ class OrbusLauncher(ctk.CTk):
             except: pass
         threading.Thread(target=run, daemon=True).start()
 
+    # --- NEW METHODS FOR ICON LOADING ---
+    def load_modpack_icon(self, url, label_widget):
+        """Downloads an image in a background thread and updates the label."""
+        try:
+            response = requests.get(url, timeout=5)
+            if response.status_code == 200:
+                # Load image from bytes
+                image_data = io.BytesIO(response.content)
+                pil_image = Image.open(image_data)
+
+                # Create CTkImage (size 48x48 to look nice in the list)
+                icon = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=(48, 48))
+
+                # Update the label on the main thread
+                self.after(0, lambda: self.update_icon_label(label_widget, icon))
+        except Exception:
+            pass
+
+    def update_icon_label(self, label, icon):
+        """Helper to safely update UI element if it still exists."""
+        try:
+            if label.winfo_exists():
+                label.configure(image=icon, text="") # Remove the placeholder text
+        except: pass
+    # ------------------------------------
+
     def add_search_result(self, h):
         fr = ctk.CTkFrame(self.results_frame)
         fr.pack(fill="x", pady=5, padx=5)
-        ctk.CTkLabel(fr, text="📦", width=50).pack(side="left", padx=10)
+
+        # Create the label with the default 📦 emoji first
+        icon_label = ctk.CTkLabel(fr, text="📦", width=50, height=50, font=ctk.CTkFont(size=24))
+        icon_label.pack(side="left", padx=10)
+
+        # Title and Author
         ctk.CTkLabel(fr, text=f"{h['title']}\nby {h['author']}", anchor="w", justify="left").pack(side="left", padx=10, fill="x", expand=True)
+
+        # Install Button
         ctk.CTkButton(fr, text="Install", width=80, command=lambda p=h['project_id']: self.install_from_modrinth(p)).pack(side="right", padx=10)
+
+        # Check if Modrinth provided an icon URL and start background download
+        if h.get("icon_url"):
+            threading.Thread(target=self.load_modpack_icon, args=(h["icon_url"], icon_label), daemon=True).start()
 
     def install_from_modrinth(self, pid):
         def run():
