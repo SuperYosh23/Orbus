@@ -409,6 +409,7 @@ class OrbusLauncher(ctk.CTk):
         self.current_instance_name = None
         self.progress_win = None
         self.tk_icon = None
+        self.curseforge_api_key = self.instances.get("_api_key", "")
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -416,26 +417,32 @@ class OrbusLauncher(ctk.CTk):
         # === SIDEBAR ===
         self.sidebar_frame = ctk.CTkFrame(self, width=220, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(3, weight=1)
+        self.sidebar_frame.grid_rowconfigure(4, weight=1)
 
         self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="O", font=ctk.CTkFont(size=32, weight="bold"))
         self.logo_label.grid(row=0, column=0, pady=(20, 5))
         ctk.CTkLabel(self.sidebar_frame, text="ORBUS", font=ctk.CTkFont(size=26, weight="bold")).grid(row=1, column=0, pady=(0, 20))
 
         self.browse_btn = ctk.CTkButton(self.sidebar_frame, text="🌐 Browse Modrinth", fg_color="#1bd964", hover_color="#15a34a", text_color="black", font=ctk.CTkFont(weight="bold"), command=self.open_modrinth_search)
-        self.browse_btn.grid(row=2, column=0, padx=20, pady=10)
+        self.browse_btn.grid(row=2, column=0, padx=20, pady=(10, 5))
+
+        self.browse_curse_btn = ctk.CTkButton(self.sidebar_frame, text="🔥 Browse CurseForge", fg_color="#ff6b35", hover_color="#cc5429", text_color="black", font=ctk.CTkFont(weight="bold"), command=self.open_curseforge_search)
+        self.browse_curse_btn.grid(row=3, column=0, padx=20, pady=(5, 10))
 
         self.scrollable_list = ctk.CTkScrollableFrame(self.sidebar_frame, label_text="My Instances")
-        self.scrollable_list.grid(row=3, column=0, padx=15, pady=10, sticky="nsew")
+        self.scrollable_list.grid(row=4, column=0, padx=15, pady=10, sticky="nsew")
 
         self.add_btn = ctk.CTkButton(self.sidebar_frame, text="+ New Instance", command=self.add_instance, fg_color="gray25")
-        self.add_btn.grid(row=4, column=0, padx=20, pady=5)
+        self.add_btn.grid(row=5, column=0, padx=20, pady=5)
 
         self.import_btn = ctk.CTkButton(self.sidebar_frame, text="📥 Import .zip/.mrpack", command=self.import_modpack, fg_color="gray25")
-        self.import_btn.grid(row=5, column=0, padx=20, pady=5)
+        self.import_btn.grid(row=6, column=0, padx=20, pady=5)
 
         self.del_btn = ctk.CTkButton(self.sidebar_frame, text="Delete Instance", fg_color="#cf3838", hover_color="#8a2525", command=self.delete_instance)
-        self.del_btn.grid(row=6, column=0, padx=20, pady=(10, 20))
+        self.del_btn.grid(row=7, column=0, padx=20, pady=(10, 20))
+
+        self.settings_btn = ctk.CTkButton(self.sidebar_frame, text="⚙️ Settings", fg_color="gray25", command=self.open_settings)
+        self.settings_btn.grid(row=8, column=0, padx=20, pady=5)
 
         # === MAIN PANEL ===
         self.main_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
@@ -549,6 +556,42 @@ class OrbusLauncher(ctk.CTk):
             self.java_entry.delete(0, 'end')
             self.java_entry.insert(0, filename)
 
+    def open_settings(self):
+        settings_win = ctk.CTkToplevel(self)
+        settings_win.title("Settings")
+        settings_win.geometry("500x300")
+        settings_win.attributes('-topmost', True)
+        
+        settings_frame = ctk.CTkScrollableFrame(settings_win)
+        settings_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        ctk.CTkLabel(settings_frame, text="CurseForge Settings", font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", pady=(0, 15))
+        
+        ctk.CTkLabel(settings_frame, text="CurseForge API Key (Optional)", text_color="gray", font=ctk.CTkFont(size=10)).pack(anchor="w")
+        
+        api_frame = ctk.CTkFrame(settings_frame, fg_color="transparent")
+        api_frame.pack(fill="x", pady=(5, 15))
+        
+        api_entry = ctk.CTkEntry(api_frame, placeholder_text="Paste your CurseForge API key here...")
+        api_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        api_entry.insert(0, self.curseforge_api_key)
+        
+        help_label = ctk.CTkLabel(settings_frame, text="Get API key from: https://console.curseforge.com/", 
+                                 text_color="gray", font=ctk.CTkFont(size=9), justify="left")
+        help_label.pack(anchor="w", pady=(0, 10))
+        
+        ctk.CTkLabel(settings_frame, text="With an API key, you can:", text_color="gray", font=ctk.CTkFont(size=10)).pack(anchor="w")
+        ctk.CTkLabel(settings_frame, text="• Search CurseForge modpacks directly\n• Download without leaving the launcher", 
+                    text_color="gray", justify="left", font=ctk.CTkFont(size=9)).pack(anchor="w", padx=20)
+        
+        def save_settings():
+            self.curseforge_api_key = api_entry.get()
+            self.save_config()
+            messagebox.showinfo("Success", "Settings saved!")
+            settings_win.destroy()
+        
+        ctk.CTkButton(settings_frame, text="Save Settings", command=save_settings, fg_color="#3B8ED0").pack(fill="x", pady=20)
+
     def update_ram_label(self, val):
         self.ram_label.configure(text=f"{int(val)} GB")
 
@@ -569,6 +612,7 @@ class OrbusLauncher(ctk.CTk):
                 "ram": int(self.ram_slider.get()),
                 "java_path": self.java_entry.get()
             })
+        self.instances["_api_key"] = self.curseforge_api_key
         with open(CONFIG_FILE, 'w') as f: json.dump(self.instances, f, indent=4)
 
     def load_versions_bg(self):
@@ -648,6 +692,145 @@ class OrbusLauncher(ctk.CTk):
         else: subprocess.Popen(["xdg-open", path])
 
     # --- Modpack Logic ---
+    def open_curseforge_search(self):
+        self.search_win = ctk.CTkToplevel(self)
+        self.search_win.title("CurseForge Modpacks")
+        self.search_win.geometry("750x650")
+        
+        if self.curseforge_api_key:
+            self.show_curseforge_api_search()
+        else:
+            self.show_curseforge_manual_import()
+    
+    def show_curseforge_manual_import(self):
+        # Info frame
+        info_frame = ctk.CTkFrame(self.search_win)
+        info_frame.pack(fill="x", padx=20, pady=20)
+        
+        ctk.CTkLabel(info_frame, text="CurseForge Integration", font=ctk.CTkFont(size=16, weight="bold")).pack()
+        ctk.CTkLabel(info_frame, text="No API key configured", text_color="gray").pack()
+        ctk.CTkLabel(info_frame, text="Download modpacks from CurseForge and import them here:", text_color="gray").pack(pady=(10, 0))
+        
+        button_frame = ctk.CTkFrame(info_frame, fg_color="transparent")
+        button_frame.pack(fill="x", pady=15)
+        
+        ctk.CTkButton(button_frame, text="🌐 Open CurseForge", 
+                     command=lambda: self.open_url("https://www.curseforge.com/minecraft/modpacks"),
+                     fg_color="#ff6b35", hover_color="#cc5429", text_color="black",
+                     font=ctk.CTkFont(weight="bold")).pack(fill="x", pady=5)
+        
+        ctk.CTkButton(button_frame, text="📂 Import Modpack File",
+                     command=self.import_modpack,
+                     fg_color="#3B8ED0").pack(fill="x", pady=5)
+        
+        ctk.CTkButton(button_frame, text="⚙️ Add API Key",
+                     command=self.open_settings,
+                     fg_color="#4a4a4a").pack(fill="x", pady=5)
+        
+        # Instructions
+        instructions = """
+How to use without API key:
+1. Visit CurseForge.com and find a modpack
+2. Click "Download" to get the .zip file
+3. Use "Import Modpack File" above to add it to Orbus
+4. The launcher will auto-detect the version and mods!
+
+Optional: Add a CurseForge API key in Settings to search directly!
+        """
+        ctk.CTkLabel(info_frame, text=instructions, justify="left", text_color="gray",
+                    font=ctk.CTkFont(size=11)).pack(pady=15, padx=10)
+    
+    def show_curseforge_api_search(self):
+        container = ctk.CTkFrame(self.search_win)
+        container.pack(fill="x", padx=20, pady=20)
+        
+        ctk.CTkLabel(container, text="CurseForge Modpack Search", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w", pady=(0, 10))
+        
+        search_frame = ctk.CTkFrame(container, fg_color="transparent")
+        search_frame.pack(fill="x", padx=0, pady=(0, 10))
+        
+        self.curse_search_entry = ctk.CTkEntry(search_frame, placeholder_text="Search modpacks...")
+        self.curse_search_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        self.curse_search_entry.bind("<Return>", lambda e: self.perform_curseforge_api_search())
+        
+        ctk.CTkButton(search_frame, text="Search", command=self.perform_curseforge_api_search).pack(side="right")
+        
+        self.curse_results_frame = ctk.CTkScrollableFrame(self.search_win, label_text="Results")
+        self.curse_results_frame.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        
+        ctk.CTkLabel(self.curse_results_frame, text="Loading popular modpacks...", text_color="gray").pack(pady=20)
+        self.perform_curseforge_api_search(True)
+    
+    def perform_curseforge_api_search(self, is_rec=False):
+        q = self.curse_search_entry.get() if not is_rec else ""
+        for w in self.curse_results_frame.winfo_children(): w.destroy()
+        
+        def run():
+            try:
+                u = f"https://api.curseforge.com/v2/mods/search?gameId=432&classId=4471&searchFilter={q}&limit=20&sortField=2&sortOrder=desc"
+                headers = {"User-Agent": "Orbus/3.3", "x-api-key": self.curseforge_api_key}
+                d = requests.get(u, headers=headers, timeout=10).json()
+                
+                if d.get("data"):
+                    for h in d.get("data", []): 
+                        self.after(0, lambda x=h: self.add_curseforge_api_result(x))
+                else:
+                    self.after(0, lambda: self.show_no_results())
+            except Exception as e:
+                self.after(0, lambda: self.show_search_error(str(e)))
+        
+        threading.Thread(target=run, daemon=True).start()
+    
+    def add_curseforge_api_result(self, h):
+        fr = ctk.CTkFrame(self.curse_results_frame)
+        fr.pack(fill="x", pady=5, padx=5)
+        
+        icon_label = ctk.CTkLabel(fr, text="📦", width=50, height=50, font=ctk.CTkFont(size=24))
+        icon_label.pack(side="left", padx=10)
+        
+        author_name = h['authors'][0]['name'] if h.get('authors') else 'Unknown'
+        ctk.CTkLabel(fr, text=f"{h['name']}\nby {author_name}", anchor="w", justify="left").pack(side="left", padx=10, fill="x", expand=True)
+        
+        ctk.CTkButton(fr, text="Install", width=80, command=lambda mid=h['id']: self.install_from_curseforge_api(mid)).pack(side="right", padx=10)
+        
+        if h.get("logo") and h["logo"].get("url"):
+            threading.Thread(target=self.load_modpack_icon, args=(h["logo"]["url"], icon_label), daemon=True).start()
+    
+    def install_from_curseforge_api(self, mod_id):
+        def run():
+            try:
+                self.after(0, lambda: self.show_progress_ui("Downloading..."))
+                headers = {"User-Agent": "Orbus/3.3", "x-api-key": self.curseforge_api_key}
+                v = requests.get(f"https://api.curseforge.com/v2/mods/{mod_id}/files?pageSize=1&sortField=dateCreated", 
+                               headers=headers, timeout=10).json()
+                if v.get("data"):
+                    file_data = v["data"][0]
+                    u = file_data.get("downloadUrl")
+                    if not u:
+                        raise Exception("Cannot download: file link not available")
+                    t = os.path.join(INSTANCES_DIR, "download.zip")
+                    with open(t, "wb") as f: f.write(requests.get(u, timeout=30).content)
+                    self.process_modpack(t)
+                else:
+                    raise Exception("No files found for this modpack")
+            except Exception as e: 
+                self.after(0, lambda: messagebox.showerror("Error", str(e)))
+        threading.Thread(target=run, daemon=True).start()
+    
+    def show_no_results(self):
+        ctk.CTkLabel(self.curse_results_frame, text="No results found", text_color="gray").pack(pady=20)
+    
+    def show_search_error(self, error):
+        ctk.CTkLabel(self.curse_results_frame, text=f"Search error: {error}", text_color="red").pack(pady=20)
+
+    def open_url(self, url):
+        if sys.platform == "win32":
+            os.startfile(url)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", url])
+        else:
+            subprocess.Popen(["xdg-open", url])
+
     def open_modrinth_search(self):
         self.search_win = ctk.CTkToplevel(self)
         self.search_win.title("Modrinth Browser")
@@ -719,6 +902,7 @@ class OrbusLauncher(ctk.CTk):
         try:
             with zipfile.ZipFile(path, 'r') as z:
                 if "modrinth.index.json" in z.namelist(): self.install_mrpack(z)
+                elif "manifest.json" in z.namelist(): self.install_curseforge_zip(z)
                 else: self.install_basic_zip(z, path)
             self.after(0, self.cleanup_installation)
         except Exception as e: self.after(0, lambda: messagebox.showerror("Error", str(e)))
@@ -738,6 +922,40 @@ class OrbusLauncher(ctk.CTk):
             self.after(0, lambda v=(i+1)/len(fs): self.prog_bar.set(v))
             dst = os.path.join(p, f_o["path"]); os.makedirs(os.path.dirname(dst), exist_ok=True)
             with open(dst, "wb") as f: f.write(requests.get(f_o["downloads"][0]).content)
+        for file in z.namelist():
+            if file.startswith("overrides/"):
+                rel_path = file.replace("overrides/", "")
+                if rel_path:
+                    dest = os.path.join(p, rel_path)
+                    if file.endswith("/"): os.makedirs(dest, exist_ok=True)
+                    else:
+                        os.makedirs(os.path.dirname(dest), exist_ok=True)
+                        with open(dest, "wb") as f: f.write(z.read(file))
+
+    def install_curseforge_zip(self, z):
+        manifest = json.loads(z.read("manifest.json"))
+        n = manifest.get("name", "CurseForge Pack")
+        mc_ver = manifest.get("minecraft", {}).get("version", "1.21.1")
+        mods = manifest.get("minecraft", {}).get("modLoaders", [])
+        ldr = "Vanilla"
+        if mods:
+            loader_id = mods[0].get("id", "")
+            if "fabric" in loader_id.lower(): ldr = "Fabric"
+            elif "quilt" in loader_id.lower(): ldr = "Quilt"
+            elif "forge" in loader_id.lower(): ldr = "Vanilla"
+        self.instances[n] = {"username": self.username_entry.get(), "version": mc_ver, "loader": ldr, "loader_version": "latest", "ram": 4, "java_path": ""}
+        self.save_config(); p = os.path.join(INSTANCES_DIR, n); os.makedirs(p, exist_ok=True)
+        fs = manifest.get("files", [])
+        for i, f_o in enumerate(fs):
+            self.after(0, lambda v=(i+1)/len(fs): self.prog_bar.set(v) if hasattr(self, 'prog_bar') else None)
+            url = f_o.get("downloadUrl")
+            file_path = f_o.get("targetFolder", "") + "/" + f_o.get("fileName", "")
+            if url:
+                try:
+                    dst = os.path.join(p, file_path.lstrip("/"))
+                    os.makedirs(os.path.dirname(dst), exist_ok=True)
+                    with open(dst, "wb") as f: f.write(requests.get(url).content)
+                except: pass
         for file in z.namelist():
             if file.startswith("overrides/"):
                 rel_path = file.replace("overrides/", "")
