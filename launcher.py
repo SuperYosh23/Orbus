@@ -97,6 +97,171 @@ def find_system_javas():
     # Sort by version (descending roughly)
     return sorted(results, key=lambda x: x['version'], reverse=True)
 
+
+def find_system_javas_enhanced(deep=False):
+    """Improved scanner for Java installations.
+
+    - Scans PATH directories for java-like executables
+    - Uses update-alternatives on Linux
+    - Uses /usr/libexec/java_home on macOS
+    - Queries Windows registry for JRE/JDK homes
+    - Uses `file` as fallback to detect 64-bit binaries
+    """
+    java_paths = set()
+
+    # Check JAVA_HOME first
+    if os.environ.get("JAVA_HOME"):
+        java_paths.add(os.path.join(os.environ["JAVA_HOME"], "bin", "javaw.exe" if sys.platform == "win32" else "java"))
+
+    # Check usual PATH names and enumerate PATH directories
+    for candidate in ("javaw", "java", "java.exe", "javaw.exe"):
+        p = shutil.which(candidate)
+        if p:
+            java_paths.add(os.path.abspath(p))
+
+    for pdir in os.environ.get("PATH", "").split(os.pathsep):
+        try:
+            if not os.path.isdir(pdir):
+                continue
+            for fname in os.listdir(pdir):
+                if fname.lower().startswith("java") and os.access(os.path.join(pdir, fname), os.X_OK):
+                    java_paths.add(os.path.abspath(os.path.join(pdir, fname)))
+        except Exception:
+            pass
+
+    # Platform-specific discovery
+    search_dirs = []
+    if sys.platform == "win32":
+        search_dirs = [
+            r"C:\Program Files\Java",
+            r"C:\Program Files (x86)\Java",
+            r"C:\Program Files\Eclipse Adoptium",
+            r"C:\Program Files\Microsoft",
+            r"C:\Program Files\BellSoft",
+            r"C:\Program Files\Azul Systems",
+            r"C:\ProgramData\Oracle\Java",
+            r"C:\Program Files\Amazon Corretto"
+        ]
+        # Registry probe
+        try:
+            import winreg
+            possible = [r"SOFTWARE\\JavaSoft\\Java Runtime Environment", r"SOFTWARE\\JavaSoft\\JDK"]
+            for root in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+                for k in possible:
+                    try:
+                        key = winreg.OpenKey(root, k)
+                        i = 0
+                        while True:
+                            try:
+                                ver = winreg.EnumKey(key, i); i += 1
+                                sub = winreg.OpenKey(key, ver)
+                                java_home, _ = winreg.QueryValueEx(sub, "JavaHome")
+                                if java_home:
+                                    java_paths.add(os.path.abspath(os.path.join(java_home, "bin", "java.exe")))
+                            except OSError:
+                                break
+                    except OSError:
+                        pass
+        except Exception:
+            pass
+
+    elif sys.platform.startswith("linux"):
+        search_dirs = ["/usr/lib/jvm", "/opt", "/usr/java", "/usr/local/java", "/usr/local/bin", "/usr/bin", "/snap/bin"]
+        try:
+            proc = subprocess.run(["update-alternatives", "--list", "java"], capture_output=True, text=True, timeout=2)
+            if proc.returncode == 0:
+                for line in proc.stdout.splitlines():
+                    if line.strip():
+                        java_paths.add(os.path.abspath(line.strip()))
+        except Exception:
+            pass
+
+    elif sys.platform == "darwin":
+        search_dirs = ["/Library/Java/JavaVirtualMachines", "/System/Library/Java/JavaVirtualMachines", "/usr/local/opt"]
+        try:
+            proc = subprocess.run(["/usr/libexec/java_home", "-V"], capture_output=True, text=True, timeout=2)
+            for line in (proc.stderr or "").splitlines():
+                m = re.search(r'(/.+?/Contents/Home)', line)
+                if m:
+                    java_paths.add(os.path.abspath(os.path.join(m.group(1), "bin", "java")))
+        except Exception:
+            pass
+
+    # Walk candidate directories
+    for root_dir in search_dirs:
+        if os.path.exists(root_dir):
+            for dirpath, _, filenames in os.walk(root_dir):
+                if dirpath.count(os.sep) - root_dir.count(os.sep) > (4 if not deep else 8):
+                    continue
+                targets = ("javaw.exe", "java.exe") if sys.platform == "win32" else ("java",)
+                for t in targets:
+                    if t in filenames:
+                        java_paths.add(os.path.abspath(os.path.join(dirpath, t)))
+
+    # Normalize and probe (stricter checks to avoid false positives)
+    normalized = set()
+    for p in java_paths:
+        try:
+            rp = os.path.realpath(p)
+            if os.path.exists(rp) and os.access(rp, os.X_OK):
+                normalized.add(rp)
+        except Exception:
+            pass
+
+    # Helper to validate a java executable actually reports Java info
+    def _probe_java(path):
+        try:
+            proc = subprocess.run([path, "-version"], capture_output=True, text=True, timeout=2)
+            output = (proc.stderr or "") + (proc.stdout or "")
+            # Ensure the output contains clear Java indicators
+            if not re.search(r'(?i)\b(java version|openjdk|hotspot|graalvm|jre|jdk|java\(tm\)|java virtual machine|runtime environment)\b', output):
+                return None
+            version_match = re.search(r'version "([^\"]+)"', output)
+            version_str = version_match.group(1) if version_match else "Unknown Version"
+            arch = "64-bit" if re.search(r'64-?Bit|64-bit|64bit|x86_64|amd64', output, re.I) else "32-bit"
+            if arch == "32-bit" and shutil.which("file"):
+                try:
+                    pfile = subprocess.run(["file", path], capture_output=True, text=True, timeout=2)
+                    if re.search(r'64-bit', pfile.stdout, re.I):
+                        arch = "64-bit"
+                except Exception:
+                    pass
+            return {"path": path, "version": version_str, "arch": arch}
+        except Exception:
+            return None
+
+    results = []
+    for p in sorted(normalized):
+        info = _probe_java(p)
+        if info:
+            results.append(info)
+
+    # If user placed a JDK somewhere in home or Downloads without a bin on PATH, do a limited scan
+    try:
+        home = os.path.expanduser("~")
+        scan_roots = [os.path.join(home, "Downloads"), os.path.join(home, "jdk"), os.path.join(home, "java"), os.path.join(home, "opt")]
+        for root in scan_roots:
+            if not os.path.exists(root):
+                continue
+            for dirpath, dirnames, filenames in os.walk(root):
+                # shallow scan only
+                if dirpath.count(os.sep) - root.count(os.sep) > 4:
+                    continue
+                # look for JDK markers (release file, lib/server library, or bin/java)
+                if ("release" in filenames) or os.path.exists(os.path.join(dirpath, "lib", "server", "libjvm.so")) or any(f.lower().startswith("java") for f in filenames):
+                    for exe_rel in ("bin/java", "bin/java.exe", "bin/javaw.exe"):
+                        candidate = os.path.join(dirpath, exe_rel)
+                        if os.path.exists(candidate) and os.access(candidate, os.X_OK) and candidate not in normalized:
+                            info = _probe_java(candidate)
+                            if info:
+                                results.append(info)
+                                normalized.add(candidate)
+                                break
+    except Exception:
+        pass
+
+    return sorted(results, key=lambda x: x['version'], reverse=True)
+
 # -------------------------
 # Custom Scrollable Dropdown Widget
 # -------------------------
@@ -676,11 +841,42 @@ class OrbusLauncher(ctk.CTk):
 
         self.detect_scroll = ctk.CTkScrollableFrame(self.detect_win, label_text="Found Installations")
 
-        threading.Thread(target=self.run_java_scan_thread, daemon=True).start()
+        # Deep Scan button (performs a wider, slower scan). Disabled while a scan is running.
+        self.deep_scan_btn = ctk.CTkButton(self.detect_win, text="Deep Scan (may take longer)", fg_color="#3B8ED0",
+                                           command=lambda: threading.Thread(target=self.run_java_scan_thread, kwargs={'deep': True}, daemon=True).start())
+        self.deep_scan_btn.pack(pady=8)
 
-    def run_java_scan_thread(self):
-        found_javas = find_system_javas()
-        self.after(0, lambda: self.display_java_results(found_javas))
+        # Start a quick shallow scan by default
+        threading.Thread(target=self.run_java_scan_thread, kwargs={'deep': False}, daemon=True).start()
+
+    def run_java_scan_thread(self, deep=False):
+        # Disable deep scan button while running to avoid concurrent scans
+        if hasattr(self, 'deep_scan_btn'):
+            try:
+                self.after(0, lambda: self.deep_scan_btn.configure(state="disabled"))
+            except Exception:
+                pass
+
+        # Update status & ensure progress is visible
+        if deep:
+            self.after(0, lambda: self.detect_status.configure(text="Deep scanning system for Java... (may take a while)"))
+        else:
+            self.after(0, lambda: self.detect_status.configure(text="Scanning system for Java..."))
+        try:
+            self.after(0, lambda: (self.detect_progress.pack(pady=10), self.detect_progress.set(0), self.detect_progress.start()))
+        except Exception:
+            pass
+
+        try:
+            found_javas = find_system_javas_enhanced(deep=deep)
+            self.after(0, lambda: self.display_java_results(found_javas))
+        finally:
+            # Re-enable the deep scan button when done
+            if hasattr(self, 'deep_scan_btn'):
+                try:
+                    self.after(0, lambda: self.deep_scan_btn.configure(state="normal"))
+                except Exception:
+                    pass
 
     def display_java_results(self, javas):
         if not self.detect_win.winfo_exists(): return
