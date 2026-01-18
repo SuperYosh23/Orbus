@@ -7,9 +7,9 @@ import shutil
 import zipfile
 import requests
 import io
-import re  # Added for parsing Java version strings
+import re
 import customtkinter as ctk
-from tkinter import filedialog, messagebox, simpledialog
+from tkinter import filedialog, messagebox, simpledialog, Menu
 from PIL import Image, ImageTk
 import minecraft_launcher_lib
 
@@ -36,167 +36,58 @@ os.makedirs(INSTANCES_DIR, exist_ok=True)
 # Helper Function: Java Scanner
 # -------------------------
 def find_system_javas_enhanced(deep=False):
-    """Improved scanner for Java installations.
-
-    - Scans PATH directories for java-like executables
-    - Uses update-alternatives on Linux
-    - Uses /usr/libexec/java_home on macOS
-    - Queries Windows registry for JRE/JDK homes
-    - Uses `file` as fallback to detect 64-bit binaries
-    """
     java_paths = set()
-
-    # Check JAVA_HOME first
     if os.environ.get("JAVA_HOME"):
         java_paths.add(os.path.join(os.environ["JAVA_HOME"], "bin", "javaw.exe" if sys.platform == "win32" else "java"))
 
-    # Check usual PATH names and enumerate PATH directories
     for candidate in ("javaw", "java", "java.exe", "javaw.exe"):
         p = shutil.which(candidate)
-        if p:
-            java_paths.add(os.path.abspath(p))
+        if p: java_paths.add(os.path.abspath(p))
 
     for pdir in os.environ.get("PATH", "").split(os.pathsep):
         try:
-            if not os.path.isdir(pdir):
-                continue
+            if not os.path.isdir(pdir): continue
             for fname in os.listdir(pdir):
                 if fname.lower().startswith("java") and os.access(os.path.join(pdir, fname), os.X_OK):
                     java_paths.add(os.path.abspath(os.path.join(pdir, fname)))
-        except Exception:
-            pass
+        except: pass
 
-    # Platform-specific discovery
     search_dirs = []
     if sys.platform == "win32":
-        search_dirs = [
-            r"C:\Program Files\Java",
-            r"C:\Program Files (x86)\Java",
-            r"C:\Program Files\Eclipse Adoptium",
-            r"C:\Program Files\Microsoft",
-            r"C:\Program Files\BellSoft",
-            r"C:\Program Files\Azul Systems",
-            r"C:\ProgramData\Oracle\Java",
-            r"C:\Program Files\Amazon Corretto"
-        ]
-        # Registry probe
-        try:
-            import winreg
-            possible = [r"SOFTWARE\\JavaSoft\\Java Runtime Environment", r"SOFTWARE\\JavaSoft\\JDK"]
-            for root in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
-                for k in possible:
-                    try:
-                        key = winreg.OpenKey(root, k)
-                        i = 0
-                        while True:
-                            try:
-                                ver = winreg.EnumKey(key, i); i += 1
-                                sub = winreg.OpenKey(key, ver)
-                                java_home, _ = winreg.QueryValueEx(sub, "JavaHome")
-                                if java_home:
-                                    java_paths.add(os.path.abspath(os.path.join(java_home, "bin", "java.exe")))
-                            except OSError:
-                                break
-                    except OSError:
-                        pass
-        except Exception:
-            pass
-
+        search_dirs = [r"C:\Program Files\Java", r"C:\Program Files (x86)\Java", r"C:\Program Files\Eclipse Adoptium", r"C:\Program Files\Microsoft", r"C:\Program Files\BellSoft", r"C:\Program Files\Azul Systems", r"C:\ProgramData\Oracle\Java", r"C:\Program Files\Amazon Corretto"]
     elif sys.platform.startswith("linux"):
-        search_dirs = ["/usr/lib/jvm", "/opt", "/usr/java", "/usr/local/java", "/usr/local/bin", "/usr/bin", "/snap/bin"]
-        try:
-            proc = subprocess.run(["update-alternatives", "--list", "java"], capture_output=True, text=True, timeout=2)
-            if proc.returncode == 0:
-                for line in proc.stdout.splitlines():
-                    if line.strip():
-                        java_paths.add(os.path.abspath(line.strip()))
-        except Exception:
-            pass
-
+        search_dirs = ["/usr/lib/jvm", "/opt", "/usr/java"]
     elif sys.platform == "darwin":
-        search_dirs = ["/Library/Java/JavaVirtualMachines", "/System/Library/Java/JavaVirtualMachines", "/usr/local/opt"]
-        try:
-            proc = subprocess.run(["/usr/libexec/java_home", "-V"], capture_output=True, text=True, timeout=2)
-            for line in (proc.stderr or "").splitlines():
-                m = re.search(r'(/.+?/Contents/Home)', line)
-                if m:
-                    java_paths.add(os.path.abspath(os.path.join(m.group(1), "bin", "java")))
-        except Exception:
-            pass
+        search_dirs = ["/Library/Java/JavaVirtualMachines"]
 
-    # Walk candidate directories
     for root_dir in search_dirs:
         if os.path.exists(root_dir):
             for dirpath, _, filenames in os.walk(root_dir):
-                if dirpath.count(os.sep) - root_dir.count(os.sep) > (4 if not deep else 8):
-                    continue
+                if dirpath.count(os.sep) - root_dir.count(os.sep) > (4 if not deep else 8): continue
                 targets = ("javaw.exe", "java.exe") if sys.platform == "win32" else ("java",)
                 for t in targets:
-                    if t in filenames:
-                        java_paths.add(os.path.abspath(os.path.join(dirpath, t)))
+                    if t in filenames: java_paths.add(os.path.abspath(os.path.join(dirpath, t)))
 
-    # Normalize and probe (stricter checks to avoid false positives)
     normalized = set()
     for p in java_paths:
         try:
             rp = os.path.realpath(p)
-            if os.path.exists(rp) and os.access(rp, os.X_OK):
-                normalized.add(rp)
-        except Exception:
-            pass
+            if os.path.exists(rp) and os.access(rp, os.X_OK): normalized.add(rp)
+        except: pass
 
-    # Helper to validate a java executable actually reports Java info
     def _probe_java(path):
         try:
             proc = subprocess.run([path, "-version"], capture_output=True, text=True, timeout=2)
             output = (proc.stderr or "") + (proc.stdout or "")
-            # Ensure the output contains clear Java indicators
-            if not re.search(r'(?i)\b(java version|openjdk|hotspot|graalvm|jre|jdk|java\(tm\)|java virtual machine|runtime environment)\b', output):
-                return None
+            if not re.search(r'(?i)\b(java version|openjdk|hotspot|graalvm|jre|jdk|java\(tm\)|java virtual machine|runtime environment)\b', output): return None
             version_match = re.search(r'version "([^\"]+)"', output)
-            version_str = version_match.group(1) if version_match else "Unknown Version"
-            arch = "64-bit" if re.search(r'64-?Bit|64-bit|64bit|x86_64|amd64', output, re.I) else "32-bit"
-            if arch == "32-bit" and shutil.which("file"):
-                try:
-                    pfile = subprocess.run(["file", path], capture_output=True, text=True, timeout=2)
-                    if re.search(r'64-bit', pfile.stdout, re.I):
-                        arch = "64-bit"
-                except Exception:
-                    pass
-            return {"path": path, "version": version_str, "arch": arch}
-        except Exception:
-            return None
+            return {"path": path, "version": version_match.group(1) if version_match else "Unknown", "arch": "64-bit" if "64-bit" in output else "32-bit"}
+        except: return None
 
     results = []
     for p in sorted(normalized):
         info = _probe_java(p)
-        if info:
-            results.append(info)
-
-    # If user placed a JDK somewhere in home or Downloads without a bin on PATH, do a limited scan
-    try:
-        home = os.path.expanduser("~")
-        scan_roots = [os.path.join(home, "Downloads"), os.path.join(home, "jdk"), os.path.join(home, "java"), os.path.join(home, "opt")]
-        for root in scan_roots:
-            if not os.path.exists(root):
-                continue
-            for dirpath, dirnames, filenames in os.walk(root):
-                # shallow scan only
-                if dirpath.count(os.sep) - root.count(os.sep) > 4:
-                    continue
-                # look for JDK markers (release file, lib/server library, or bin/java)
-                if ("release" in filenames) or os.path.exists(os.path.join(dirpath, "lib", "server", "libjvm.so")) or any(f.lower().startswith("java") for f in filenames):
-                    for exe_rel in ("bin/java", "bin/java.exe", "bin/javaw.exe"):
-                        candidate = os.path.join(dirpath, exe_rel)
-                        if os.path.exists(candidate) and os.access(candidate, os.X_OK) and candidate not in normalized:
-                            info = _probe_java(candidate)
-                            if info:
-                                results.append(info)
-                                normalized.add(candidate)
-                                break
-    except Exception:
-        pass
-
+        if info: results.append(info)
     return sorted(results, key=lambda x: x['version'], reverse=True)
 
 # -------------------------
@@ -210,96 +101,59 @@ class ScrollableComboBox(ctk.CTkFrame):
         self.width = width
         self.is_open = False
         self.selected_value = values[0] if values else ""
-
-        # Main Button
-        self.main_button = ctk.CTkButton(self, text=self.selected_value, width=width, height=height,
-                                         fg_color="gray20", hover_color="gray30",
-                                         command=self.toggle_dropdown)
+        self.main_button = ctk.CTkButton(self, text=self.selected_value, width=width, height=height, fg_color="gray20", hover_color="gray30", command=self.toggle_dropdown)
         self.main_button.pack(fill="both", expand=True)
-
         self.dropdown_window = None
 
     def toggle_dropdown(self):
-        if self.is_open:
-            self.close_dropdown()
-        else:
-            self.open_dropdown()
+        if self.is_open: self.close_dropdown()
+        else: self.open_dropdown()
 
     def open_dropdown(self):
         if self.dropdown_window: return
         self.is_open = True
-
-        # Calculate Position
         x = self.main_button.winfo_rootx()
         y = self.main_button.winfo_rooty() + self.main_button.winfo_height() + 5
-
-        # Create Popup Window
         self.dropdown_window = ctk.CTkToplevel(self)
         self.dropdown_window.geometry(f"{self.width}x300+{x}+{y}")
         self.dropdown_window.overrideredirect(True)
         self.dropdown_window.attributes('-topmost', True)
-
-        # Search Entry
         self.search_var = ctk.StringVar()
         self.search_var.trace("w", self.filter_options)
         self.search_entry = ctk.CTkEntry(self.dropdown_window, placeholder_text="Type to search...", textvariable=self.search_var)
         self.search_entry.pack(fill="x", padx=5, pady=5)
-
         self.search_entry.focus_set()
-
-        # Scrollable List
         self.scroll_frame = ctk.CTkScrollableFrame(self.dropdown_window, width=self.width, height=250)
         self.scroll_frame.pack(fill="both", expand=True)
-
         self.populate_options(self.values)
-
         self.dropdown_window.bind("<FocusOut>", self._on_focus_out)
 
     def _on_focus_out(self, event):
         if self.dropdown_window:
             new_focus = event.widget.focus_get()
             try:
-                if new_focus and (str(new_focus).startswith(str(self.dropdown_window))):
-                    return
+                if new_focus and (str(new_focus).startswith(str(self.dropdown_window))): return
             except: pass
             self.close_dropdown()
 
     def populate_options(self, options):
-        for widget in self.scroll_frame.winfo_children():
-            widget.destroy()
-
+        for widget in self.scroll_frame.winfo_children(): widget.destroy()
         if not options:
-            btn = ctk.CTkLabel(self.scroll_frame, text="No results found", text_color="gray")
-            btn.pack(pady=5)
+            ctk.CTkLabel(self.scroll_frame, text="No results found", text_color="gray").pack(pady=5)
         else:
             for val in options:
-                btn = ctk.CTkButton(self.scroll_frame, text=val, fg_color="transparent",
-                                    text_color=("black", "white"), anchor="w",
-                                    height=24,
-                                    command=lambda v=val: self.select_option(v))
+                btn = ctk.CTkButton(self.scroll_frame, text=val, fg_color="transparent", text_color=("black", "white"), anchor="w", height=24, command=lambda v=val: self.select_option(v))
                 btn.pack(fill="x", pady=1)
-                self._bind_mouse_scroll(btn)
-
-        self._bind_mouse_scroll(self.scroll_frame)
-        self._bind_mouse_scroll(self.scroll_frame._parent_canvas)
-        self.scroll_frame._parent_canvas.yview_moveto(0.0)
-
-    def _bind_mouse_scroll(self, widget):
-        widget.bind("<Button-4>", lambda e: self.scroll_frame._parent_canvas.yview_scroll(-1, "units"))
-        widget.bind("<Button-5>", lambda e: self.scroll_frame._parent_canvas.yview_scroll(1, "units"))
-        widget.bind("<MouseWheel>", lambda e: self.scroll_frame._parent_canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
     def filter_options(self, *args):
         search_text = self.search_var.get().lower()
-        filtered = [v for v in self.values if search_text in v.lower()]
-        self.populate_options(filtered)
+        self.populate_options([v for v in self.values if search_text in v.lower()])
 
     def select_option(self, value):
         self.selected_value = value
         self.main_button.configure(text=value)
         self.close_dropdown()
-        if self.command:
-            self.command(value)
+        if self.command: self.command(value)
 
     def close_dropdown(self):
         if self.dropdown_window:
@@ -307,13 +161,10 @@ class ScrollableComboBox(ctk.CTkFrame):
             self.dropdown_window = None
         self.is_open = False
 
-    def get(self):
-        return self.selected_value
-
+    def get(self): return self.selected_value
     def set(self, value):
         self.selected_value = value
         self.main_button.configure(text=value)
-
     def configure(self, values=None):
         if values is not None:
             self.values = values
@@ -346,10 +197,11 @@ class OrbusLauncher(ctk.CTk):
         self.current_instance_name = None
         self.progress_win = None
         self.tk_icon = None
+        self.context_menu_ref = None # Reference to active context menu
 
-        # Drag and Drop state variables
+        # Drag and Drop variables
         self.drag_data = {"widget": None, "index": None, "start_y": 0}
-        self.instance_widgets = [] # We need to keep track of the button objects
+        self.instance_widgets = []
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -375,12 +227,9 @@ class OrbusLauncher(ctk.CTk):
         self.import_btn = ctk.CTkButton(self.sidebar_frame, text="📥 Import .zip/.mrpack", command=self.import_modpack, fg_color="gray25")
         self.import_btn.grid(row=5, column=0, padx=20, pady=5)
 
-        # Rename button
-        self.rename_btn = ctk.CTkButton(self.sidebar_frame, text="✏️ Rename Instance", fg_color="#f5a623", hover_color="#d48a1f", command=self.rename_instance)
-        self.rename_btn.grid(row=6, column=0, padx=20, pady=5)
-
+        # Removed Rename Button, moved Delete Button up
         self.del_btn = ctk.CTkButton(self.sidebar_frame, text="Delete Instance", fg_color="#cf3838", hover_color="#8a2525", command=self.delete_instance)
-        self.del_btn.grid(row=7, column=0, padx=20, pady=(10, 5))
+        self.del_btn.grid(row=6, column=0, padx=20, pady=(10, 5))
 
         # === MAIN PANEL ===
         self.main_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
@@ -396,39 +245,26 @@ class OrbusLauncher(ctk.CTk):
         self.username_entry = ctk.CTkEntry(self.settings_frame)
         self.username_entry.pack(fill="x", padx=20, pady=(5, 10))
 
-        # --- VERSION DROPDOWNS ---
         ctk.CTkLabel(self.settings_frame, text="MC Version").pack(anchor="w", padx=20)
         self.version_combo = ScrollableComboBox(self.settings_frame, values=["Loading..."])
         self.version_combo.pack(fill="x", padx=20, pady=(5, 10))
 
         ctk.CTkLabel(self.settings_frame, text="Mod Loader").pack(anchor="w", padx=20)
-        self.loader_combo = ctk.CTkComboBox(
-            self.settings_frame,
-            values=["Vanilla", "Fabric", "Quilt"],
-            command=self.toggle_loader_settings
-        )
+        self.loader_combo = ctk.CTkComboBox(self.settings_frame, values=["Vanilla", "Fabric", "Quilt"], command=self.toggle_loader_settings)
         self.loader_combo.pack(fill="x", padx=20, pady=(5, 10))
 
         self.loader_ver_label = ctk.CTkLabel(self.settings_frame, text="Fabric Loader Version")
         self.loader_ver_combo = ScrollableComboBox(self.settings_frame, values=["latest"])
-        # -------------------------
 
-        # --- JAVA SELECTION (MODIFIED) ---
-        ctk.CTkLabel(self.settings_frame, text="Java Executable (Leave empty for default)").pack(anchor="w", padx=20, pady=(10, 0))
+        ctk.CTkLabel(self.settings_frame, text="Java Executable").pack(anchor="w", padx=20, pady=(10, 0))
         self.java_frame = ctk.CTkFrame(self.settings_frame, fg_color="transparent")
         self.java_frame.pack(fill="x", padx=20, pady=(5, 10))
-
         self.java_entry = ctk.CTkEntry(self.java_frame, placeholder_text="Default: java/javaw")
         self.java_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
-
-        # New Auto Detect Button
-        self.java_auto_btn = ctk.CTkButton(self.java_frame, text="Auto Detect", width=80,
-                                           fg_color="#3B8ED0", command=self.open_java_detector)
+        self.java_auto_btn = ctk.CTkButton(self.java_frame, text="Auto Detect", width=80, fg_color="#3B8ED0", command=self.open_java_detector)
         self.java_auto_btn.pack(side="right", padx=(5, 0))
-
         self.java_browse_btn = ctk.CTkButton(self.java_frame, text="Browse", width=80, command=self.browse_java_path)
         self.java_browse_btn.pack(side="right")
-        # -------------------------
 
         ctk.CTkLabel(self.settings_frame, text="RAM Allocation (GB)").pack(anchor="w", padx=20, pady=(10, 0))
         self.ram_label = ctk.CTkLabel(self.settings_frame, text="4 GB", font=ctk.CTkFont(weight="bold"))
@@ -448,12 +284,10 @@ class OrbusLauncher(ctk.CTk):
 
         self.status_label = ctk.CTkLabel(self.main_frame, text="Ready", text_color="gray")
         self.status_label.pack(side="bottom", pady=5)
-
         self.launch_btn = ctk.CTkButton(self.main_frame, text="LAUNCH GAME", height=55, font=ctk.CTkFont(size=20, weight="bold"), command=self.start_launch_thread)
         self.launch_btn.pack(side="bottom", fill="x", padx=20, pady=10)
 
         self.refresh_instance_buttons()
-
         threading.Thread(target=self.download_icon_bg, daemon=True).start()
         threading.Thread(target=self.load_versions_bg, daemon=True).start()
         threading.Thread(target=self.load_fabric_versions_bg, daemon=True).start()
@@ -467,8 +301,7 @@ class OrbusLauncher(ctk.CTk):
                 self.tk_icon = ImageTk.PhotoImage(icon_img)
                 self.wm_iconphoto(True, self.tk_icon)
                 self.reload_sidebar_logo()
-            except Exception as e:
-                print(f"Icon Error: {e}")
+            except: pass
 
     def download_icon_bg(self):
         if not os.path.exists(ICON_PATH):
@@ -478,8 +311,7 @@ class OrbusLauncher(ctk.CTk):
                     with open(ICON_PATH, 'wb') as f: f.write(r.content)
                     self.after(500, self.setup_icon)
             except: pass
-        else:
-            self.after(200, self.setup_icon)
+        else: self.after(200, self.setup_icon)
 
     def reload_sidebar_logo(self):
         try:
@@ -489,7 +321,7 @@ class OrbusLauncher(ctk.CTk):
 
     # --- UI Logic ---
     def browse_java_path(self):
-        filename = filedialog.askopenfilename(title="Select Java Executable", filetypes=[("Java Executable", "java javaw java.exe javaw.exe"), ("All Files", "*.*")])
+        filename = filedialog.askopenfilename(filetypes=[("Java Executable", "java javaw java.exe javaw.exe"), ("All Files", "*.*")])
         if filename:
             self.java_entry.delete(0, 'end')
             self.java_entry.insert(0, filename)
@@ -538,67 +370,114 @@ class OrbusLauncher(ctk.CTk):
             self.loader_ver_label.pack_forget()
             self.loader_ver_combo.pack_forget()
 
+    # --- Instance Buttons with Icons & Context Menu ---
     def refresh_instance_buttons(self):
-        # Clear existing widgets
-        for w in self.scrollable_list.winfo_children():
-            w.destroy()
-        
+        for w in self.scrollable_list.winfo_children(): w.destroy()
         self.instance_widgets = []
-        self.scrollable_list.grid_columnconfigure(0, weight=1) # Make buttons expand
+        self.scrollable_list.grid_columnconfigure(0, weight=1)
 
-        # Create buttons with Grid layout
         keys = list(self.instances.keys())
         for i, name in enumerate(keys):
+            icon_img = None
+            icon_path = self.instances[name].get("icon_path")
+            if icon_path and os.path.exists(icon_path):
+                try:
+                    pil_img = Image.open(icon_path)
+                    icon_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(24, 24))
+                except: pass
+
             btn = ctk.CTkButton(
                 self.scrollable_list, 
                 text=name, 
+                image=icon_img,
+                compound="left",
                 fg_color="transparent", 
                 border_width=1, 
                 anchor="w",
-                height=40,  # Fixed height helps with calculation
+                height=40,
                 command=lambda n=name: self.select_instance(n)
             )
-            # Use Grid instead of Pack for reordering capabilities
             btn.grid(row=i, column=0, sticky="ew", pady=2)
             
-            # Bind Mouse Events for Dragging
-            # We use a wrapper to pass the specific widget instance
             btn.bind("<Button-1>", lambda event, b=btn, idx=i: self.on_drag_start(event, b, idx))
             btn.bind("<B1-Motion>", lambda event: self.on_drag_motion(event))
             btn.bind("<ButtonRelease-1>", self.on_drag_end)
-            
+
+            btn.bind("<Button-3>", lambda event, n=name: self.show_context_menu(event, n))
+            if sys.platform == "darwin": 
+                 btn.bind("<Button-2>", lambda event, n=name: self.show_context_menu(event, n))
+
             self.instance_widgets.append(btn)
 
+    def show_context_menu(self, event, instance_name):
+        # 1. Close any existing menu
+        if self.context_menu_ref:
+            try: self.context_menu_ref.unpost()
+            except: pass
+        
+        # 2. Create new menu
+        menu = Menu(self, tearoff=0)
+        menu.add_command(label="Rename Instance", command=lambda: self.rename_instance(instance_name))
+        menu.add_command(label="Change Instance Icon", command=lambda: self.change_instance_icon(instance_name))
+        
+        self.context_menu_ref = menu
+        
+        # 3. Post the menu at coordinates
+        menu.post(event.x_root, event.y_root)
+
+        # 4. Bind a generic click to the entire window to close the menu
+        # 'add=+' ensures we don't overwrite other click functionality in the app
+        self.bind("<Button-1>", self.close_context_menu, add="+")
+
+    def close_context_menu(self, event=None):
+        if self.context_menu_ref:
+            try: self.context_menu_ref.unpost()
+            except: pass
+            self.context_menu_ref = None
+        # Clean up the binding so we don't keep firing this function
+        self.unbind("<Button-1>")
+
+    def change_instance_icon(self, name):
+        self.close_context_menu()
+        file_path = filedialog.askopenfilename(
+            title="Select Icon",
+            filetypes=[("Images", "*.png *.jpg *.jpeg *.ico *.bmp")]
+        )
+        if file_path:
+            dest_dir = os.path.join(INSTANCES_DIR, name)
+            if not os.path.exists(dest_dir): os.makedirs(dest_dir)
+            
+            ext = os.path.splitext(file_path)[1]
+            dest_path = os.path.join(dest_dir, f"icon{ext}")
+            
+            try:
+                shutil.copy(file_path, dest_path)
+                self.instances[name]["icon_path"] = dest_path
+                self.save_config()
+                self.refresh_instance_buttons()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to set icon: {e}")
+
+    # --- Drag & Drop Logic ---
     def on_drag_start(self, event, widget, index):
-        # Record the item being dragged
         self.drag_data["widget"] = widget
         self.drag_data["index"] = index
         self.drag_data["start_y"] = event.y_root
-        
-        # Visual feedback (optional): Change color to indicate dragging
         widget.configure(fg_color="#3B8ED0")
+        self.close_context_menu() # Safety close
 
     def on_drag_motion(self, event):
         if not self.drag_data["widget"]: return
-
-        # Calculate movement
         dy = event.y_root - self.drag_data["start_y"]
         current_index = self.drag_data["index"]
-        
-        # Threshold to trigger swap (approx height of button + padding)
-        # We set height=40 and pady=2, so ~44 pixels is one "slot"
         slot_height = 44 
 
-        # Check if we moved down
         if dy > slot_height / 2:
             target_index = current_index + 1
             if target_index < len(self.instance_widgets):
                 self.swap_widgets(current_index, target_index)
-                # Reset start_y so we can keep swapping if the user keeps dragging
                 self.drag_data["start_y"] += slot_height 
                 self.drag_data["index"] = target_index
-
-        # Check if we moved up
         elif dy < -slot_height / 2:
             target_index = current_index - 1
             if target_index >= 0:
@@ -607,32 +486,21 @@ class OrbusLauncher(ctk.CTk):
                 self.drag_data["index"] = target_index
 
     def swap_widgets(self, i1, i2):
-        # 1. Swap in the list of widgets
         self.instance_widgets[i1], self.instance_widgets[i2] = self.instance_widgets[i2], self.instance_widgets[i1]
-        
-        # 2. Update the Grid Row to visually move them
         self.instance_widgets[i1].grid(row=i1)
         self.instance_widgets[i2].grid(row=i2)
-        
-        # 3. Update the binding indices so the next swap works correctly
-        # (We need to re-bind Button-1 so the index variable is correct for the next drag)
-        w1 = self.instance_widgets[i1]
-        w2 = self.instance_widgets[i2]
+        w1, w2 = self.instance_widgets[i1], self.instance_widgets[i2]
         w1.bind("<Button-1>", lambda e, b=w1, idx=i1: self.on_drag_start(e, b, idx))
         w2.bind("<Button-1>", lambda e, b=w2, idx=i2: self.on_drag_start(e, b, idx))
 
     def on_drag_end(self, event):
         if not self.drag_data["widget"]: return
-        
-        # Reset color
         self.drag_data["widget"].configure(fg_color="transparent")
-        
-        # Commit the new order to self.instances and save config
         new_order_keys = [w.cget("text") for w in self.instance_widgets]
         self._reorder_instances(new_order_keys)
-        
         self.drag_data = {"widget": None, "index": None, "start_y": 0}
 
+    # --- CRUD Operations ---
     def select_instance(self, name):
         if self.current_instance_name: self.save_config()
         self.current_instance_name = name
@@ -645,16 +513,14 @@ class OrbusLauncher(ctk.CTk):
         self.loader_ver_combo.set(d.get("loader_version", "latest"))
         self.ram_slider.set(d.get("ram", 4))
         self.update_ram_label(self.ram_slider.get())
-
         self.java_entry.delete(0, 'end')
         self.java_entry.insert(0, d.get("java_path", ""))
-
         self.toggle_loader_settings(d.get("loader", "Vanilla"))
 
     def add_instance(self):
         n = simpledialog.askstring("New", "Instance Name:")
         if n and n not in self.instances:
-            self.instances[n] = {"username": "", "version": "1.21.1", "loader": "Vanilla", "loader_version": "latest", "ram": 4, "java_path": ""}
+            self.instances[n] = {"username": "", "version": "1.21.1", "loader": "Vanilla", "loader_version": "latest", "ram": 4, "java_path": "", "icon_path": ""}
             self.save_config(); self.refresh_instance_buttons(); self.select_instance(n)
 
     def delete_instance(self):
@@ -668,34 +534,45 @@ class OrbusLauncher(ctk.CTk):
             self.save_config(); self.refresh_instance_buttons()
             self.header_label.configure(text="Select an Instance")
 
-    def rename_instance(self):
-        if not self.current_instance_name:
+    def rename_instance(self, target_name=None):
+        self.close_context_menu()
+        target = target_name if target_name else self.current_instance_name
+        
+        if not target:
             messagebox.showwarning("Warning", "Select an instance to rename.")
             return
-        old_name = self.current_instance_name
-        new_name = simpledialog.askstring("Rename Instance", "New name for instance:", initialvalue=old_name)
-        if not new_name:
-            return
+
+        new_name = simpledialog.askstring("Rename Instance", f"Rename '{target}' to:", initialvalue=target)
+        if not new_name: return
         new_name = new_name.strip()
-        if new_name == old_name:
-            return
+        if new_name == target: return
         if new_name in self.instances:
-            messagebox.showerror("Error", f"An instance named '{new_name}' already exists.")
+            messagebox.showerror("Error", f"'{new_name}' already exists.")
             return
-        # Attempt to rename on disk (if present) and in config
-        old_folder = os.path.join(INSTANCES_DIR, old_name)
+
+        old_folder = os.path.join(INSTANCES_DIR, target)
         new_folder = os.path.join(INSTANCES_DIR, new_name)
         try:
             if os.path.exists(old_folder):
                 if os.path.exists(new_folder):
-                    messagebox.showerror("Error", f"A folder for '{new_name}' already exists on disk.")
+                    messagebox.showerror("Error", "Target folder already exists.")
                     return
                 shutil.move(old_folder, new_folder)
-            self.instances[new_name] = self.instances.pop(old_name)
-            self.current_instance_name = new_name
+            
+            self.instances[new_name] = self.instances.pop(target)
+            icon_path = self.instances[new_name].get("icon_path", "")
+            if icon_path and target in icon_path:
+                 self.instances[new_name]["icon_path"] = icon_path.replace(target, new_name)
+
+            if self.current_instance_name == target:
+                self.current_instance_name = new_name
+                self.header_label.configure(text=new_name)
+
             self.save_config()
             self.refresh_instance_buttons()
-            self.select_instance(new_name)
+            if self.current_instance_name == new_name:
+                self.select_instance(new_name)
+                
         except Exception as e:
             messagebox.showerror("Rename Error", str(e))
 
@@ -703,18 +580,14 @@ class OrbusLauncher(ctk.CTk):
         try:
             old = self.instances.copy()
             new = {}
-            for n in new_order:
-                new[n] = old[n]
+            for n in new_order: new[n] = old[n]
             self.instances = new
-            # preserve current selection
-            if self.current_instance_name not in self.instances:
-                self.current_instance_name = None
+            if self.current_instance_name not in self.instances: self.current_instance_name = None
             self.save_config(); self.refresh_instance_buttons()
-            if self.current_instance_name:
-                self.select_instance(self.current_instance_name)
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to reorder instances: {e}")
+            if self.current_instance_name: self.select_instance(self.current_instance_name)
+        except: pass
 
+    # --- Other Actions ---
     def open_mods_folder(self):
         if self.current_instance_name:
             p = os.path.join(INSTANCES_DIR, self.current_instance_name, "mods")
@@ -762,12 +635,11 @@ class OrbusLauncher(ctk.CTk):
                 pil_image = Image.open(image_data)
                 icon = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=(48, 48))
                 self.after(0, lambda: self.update_icon_label(label_widget, icon))
-        except Exception: pass
+        except: pass
 
     def update_icon_label(self, label, icon):
         try:
-            if label.winfo_exists():
-                label.configure(image=icon, text="")
+            if label.winfo_exists(): label.configure(image=icon, text="")
         except: pass
 
     def add_search_result(self, h):
@@ -812,7 +684,7 @@ class OrbusLauncher(ctk.CTk):
         idx = json.loads(z.read("modrinth.index.json"))
         n = idx.get("name", "Pack"); d = idx["dependencies"]
         ldr = "Fabric" if "fabric-loader" in d else "Quilt" if "quilt-loader" in d else "Vanilla"
-        self.instances[n] = {"username": self.username_entry.get(), "version": d["minecraft"], "loader": ldr, "loader_version": "latest", "ram": 4, "java_path": ""}
+        self.instances[n] = {"username": self.username_entry.get(), "version": d["minecraft"], "loader": ldr, "loader_version": "latest", "ram": 4, "java_path": "", "icon_path": ""}
         self.save_config(); p = os.path.join(INSTANCES_DIR, n); os.makedirs(p, exist_ok=True)
         fs = idx.get("files", [])
         for i, f_o in enumerate(fs):
@@ -831,7 +703,7 @@ class OrbusLauncher(ctk.CTk):
 
     def install_basic_zip(self, z, p_orig):
         n = os.path.splitext(os.path.basename(p_orig))[0]
-        self.instances[n] = {"username": "", "version": "1.21.1", "loader": "Vanilla", "loader_version": "latest", "ram": 4, "java_path": ""}
+        self.instances[n] = {"username": "", "version": "1.21.1", "loader": "Vanilla", "loader_version": "latest", "ram": 4, "java_path": "", "icon_path": ""}
         self.save_config(); p = os.path.join(INSTANCES_DIR, n); os.makedirs(p, exist_ok=True)
         z.extractall(p)
 
@@ -905,87 +777,57 @@ class OrbusLauncher(ctk.CTk):
             self.after(0, lambda: messagebox.showerror("Launch Error", str(e)))
             self.after(0, lambda: self.launch_btn.configure(state="normal", text="LAUNCH GAME"))
 
-    # --- New Methods for Java Detection ---
+    # --- Java Auto Detect ---
     def open_java_detector(self):
         self.detect_win = ctk.CTkToplevel(self)
         self.detect_win.title("Java Auto-Detect")
         self.detect_win.geometry("600x400")
         self.detect_win.attributes('-topmost', True)
-
         self.detect_status = ctk.CTkLabel(self.detect_win, text="Scanning system for Java...", font=ctk.CTkFont(size=16))
         self.detect_status.pack(pady=20)
-
         self.detect_progress = ctk.CTkProgressBar(self.detect_win)
         self.detect_progress.pack(pady=10)
         self.detect_progress.set(0)
         self.detect_progress.start()
-
         self.detect_scroll = ctk.CTkScrollableFrame(self.detect_win, label_text="Found Installations")
-
-        # Deep Scan button (performs a wider, slower scan). Disabled while a scan is running.
-        self.deep_scan_btn = ctk.CTkButton(self.detect_win, text="Deep Scan (may take longer)", fg_color="#3B8ED0",
-                                           command=lambda: threading.Thread(target=self.run_java_scan_thread, kwargs={'deep': True}, daemon=True).start())
+        self.deep_scan_btn = ctk.CTkButton(self.detect_win, text="Deep Scan (may take longer)", fg_color="#3B8ED0", command=lambda: threading.Thread(target=self.run_java_scan_thread, kwargs={'deep': True}, daemon=True).start())
         self.deep_scan_btn.pack(pady=8)
-
-        # Start a quick shallow scan by default
         threading.Thread(target=self.run_java_scan_thread, kwargs={'deep': False}, daemon=True).start()
 
     def run_java_scan_thread(self, deep=False):
-        # Disable deep scan button while running to avoid concurrent scans
         if hasattr(self, 'deep_scan_btn'):
-            try:
-                self.after(0, lambda: self.deep_scan_btn.configure(state="disabled"))
-            except Exception:
-                pass
-
-        # Update status & ensure progress is visible
-        if deep:
-            self.after(0, lambda: self.detect_status.configure(text="Deep scanning system for Java... (may take a while)"))
-        else:
-            self.after(0, lambda: self.detect_status.configure(text="Scanning system for Java..."))
-        try:
-            self.after(0, lambda: (self.detect_progress.pack(pady=10), self.detect_progress.set(0), self.detect_progress.start()))
-        except Exception:
-            pass
-
+            try: self.after(0, lambda: self.deep_scan_btn.configure(state="disabled"))
+            except: pass
+        if deep: self.after(0, lambda: self.detect_status.configure(text="Deep scanning system for Java... (may take a while)"))
+        else: self.after(0, lambda: self.detect_status.configure(text="Scanning system for Java..."))
+        try: self.after(0, lambda: (self.detect_progress.pack(pady=10), self.detect_progress.set(0), self.detect_progress.start()))
+        except: pass
         try:
             found_javas = find_system_javas_enhanced(deep=deep)
             self.after(0, lambda: self.display_java_results(found_javas))
         finally:
-            # Re-enable the deep scan button when done
             if hasattr(self, 'deep_scan_btn'):
-                try:
-                    self.after(0, lambda: self.deep_scan_btn.configure(state="normal"))
-                except Exception:
-                    pass
+                try: self.after(0, lambda: self.deep_scan_btn.configure(state="normal"))
+                except: pass
 
     def display_java_results(self, javas):
         if not self.detect_win.winfo_exists(): return
-
         self.detect_progress.stop()
         self.detect_progress.pack_forget()
         self.detect_status.configure(text=f"Found {len(javas)} Java versions")
         self.detect_scroll.pack(fill="both", expand=True, padx=20, pady=20)
-
         for widget in self.detect_scroll.winfo_children(): widget.destroy()
-
         if not javas:
             ctk.CTkLabel(self.detect_scroll, text="No Java installations found.").pack(pady=10)
             return
-
         for j in javas:
             card = ctk.CTkFrame(self.detect_scroll)
             card.pack(fill="x", pady=5)
-
-            info_text = f"Java {j['version']} ({j['arch']})"
-            lbl = ctk.CTkLabel(card, text=info_text, font=ctk.CTkFont(weight="bold"))
+            lbl = ctk.CTkLabel(card, text=f"Java {j['version']} ({j['arch']})", font=ctk.CTkFont(weight="bold"))
             lbl.pack(side="left", padx=10, pady=5)
-
             path_lbl = ctk.CTkLabel(card, text=j['path'], text_color="gray", font=ctk.CTkFont(size=10))
             path_lbl.pack(side="left", padx=10)
-
-            btn = ctk.CTkButton(card, text="Select", width=60,
-                                command=lambda p=j['path']: self.apply_detected_java(p))
+            btn = ctk.CTkButton(card, text="Select", width=60, command=lambda p=j['path']: self.apply_detected_java(p))
             btn.pack(side="right", padx=10, pady=5)
 
     def apply_detected_java(self, path):
