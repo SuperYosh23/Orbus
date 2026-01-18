@@ -23,9 +23,7 @@ It utilizes `minecraft-launcher-lib` for the heavy lifting and `CustomTkinter` f
 * **Live Console:** Optional log window to debug mods or watch game output in real-time.
 
 ## Screenshots
-<img width="905" height="743" alt="Screenshot_2026-01-17_20-25-03" src="https://github.com/user-attachments/assets/eec9a538-80ca-49c4-9cda-d52992fbee91" />
-
-
+<img width="905" height="743" alt="Orbus Screenshot" src="https://github.com/user-attachments/assets/eec9a538-80ca-49c4-9cda-d52992fbee91" />
 
 ## Installation & Usage
 
@@ -36,7 +34,7 @@ It utilizes `minecraft-launcher-lib` for the heavy lifting and `CustomTkinter` f
 ### Running from Source
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/SuperYosh23/Orbus.git](https://github.com/SuperYosh23/Orbus.git
+    git clone [https://github.com/SuperYosh23/Orbus.git](https://github.com/SuperYosh23/Orbus.git)
     cd Orbus
     ```
 
@@ -62,4 +60,4 @@ It utilizes `minecraft-launcher-lib` for the heavy lifting and `CustomTkinter` f
 - [ ] Auto-update functionality
 
 ## DISCLAIMER:
-This project is almost entirely AI genarated. Sorry if this upsets anyone.
+This project is mostly entirely AI generated. Sorry if that bothers or upsets you.
