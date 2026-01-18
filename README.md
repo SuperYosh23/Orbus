@@ -19,8 +19,7 @@ It utilizes `minecraft-launcher-lib` for the heavy lifting and `CustomTkinter` f
 * **Modrinth Integration:** Browse, search, and install Modpacks directly from Modrinth within the launcher.
 * **Import Support:** Import modpacks via `.zip` or `.mrpack` files.
 * **Mod Loaders:** Native support for **Vanilla**, **Fabric**, and **Quilt** (with auto-version fetching).
-* **Smart Java Detection:** Automatically scans your system for Java installations (deep scan included) so you don't have to hunt for paths.
-* **Performance Control:** Easy RAM allocation sliders and custom Java argument support.
+* **Smart Java Detection:** Automatically scans your system for Java installations so you don't have to hunt for paths.
 * **Live Console:** Optional log window to debug mods or watch game output in real-time.
 
 ## Screenshots
@@ -30,7 +29,7 @@ It utilizes `minecraft-launcher-lib` for the heavy lifting and `CustomTkinter` f
 ## Installation & Usage
 
 ### Prerequisites
-* Python 3.8 or higher
+* Python 3.10 or higher
 * An internet connection (for first-time asset downloads)
 
 ### Running from Source
@@ -60,6 +59,3 @@ It utilizes `minecraft-launcher-lib` for the heavy lifting and `CustomTkinter` f
 - [ ] CurseForge Modpack support
 - [ ] Skin management
 - [ ] Auto-update functionality
-
-## License
-This project is open source. Feel free to modify and distribute it as you learn!
