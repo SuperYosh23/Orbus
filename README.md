@@ -60,3 +60,6 @@ It utilizes `minecraft-launcher-lib` for the heavy lifting and `CustomTkinter` f
 - [ ] CurseForge Modpack support
 - [ ] Skin management
 - [ ] Auto-update functionality
+
+## DISCLAIMER:
+This project is almost entirely AI genarated. Sorry if this upsets anyone.
