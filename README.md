@@ -36,7 +36,7 @@ It utilizes `minecraft-launcher-lib` for the heavy lifting and `CustomTkinter` f
 ### Running from Source
 1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/SuperYosh23/Orbus.git](https://github.com/SuperYosh23/Orbus.git)
+    git clone https://github.com/SuperYosh23/Orbus.git](https://github.com/SuperYosh23/Orbus.git
     cd Orbus
     ```
 
