@@ -35,69 +35,6 @@ os.makedirs(INSTANCES_DIR, exist_ok=True)
 # -------------------------
 # Helper Function: Java Scanner
 # -------------------------
-def find_system_javas():
-    """Scans common directories and PATH for Java installations."""
-    java_paths = set()
-
-    # 1. Check JAVA_HOME
-    if os.environ.get("JAVA_HOME"):
-        java_paths.add(os.path.join(os.environ["JAVA_HOME"], "bin", "javaw.exe" if sys.platform == "win32" else "java"))
-
-    # 2. Check PATH
-    path_java = shutil.which("javaw") or shutil.which("java")
-    if path_java:
-        java_paths.add(os.path.abspath(path_java))
-
-    # 3. Check Common Directories
-    search_dirs = []
-    if sys.platform == "win32":
-        search_dirs = [
-            r"C:\Program Files\Java",
-            r"C:\Program Files (x86)\Java",
-            r"C:\Program Files\Eclipse Adoptium",
-            r"C:\Program Files\Microsoft",
-            r"C:\Program Files\BellSoft",
-            r"C:\Program Files\Azul Systems"
-        ]
-    elif sys.platform == "linux" or sys.platform == "linux2":
-        search_dirs = ["/usr/lib/jvm", "/opt"]
-    elif sys.platform == "darwin": # MacOS
-        search_dirs = ["/Library/Java/JavaVirtualMachines"]
-
-    for root_dir in search_dirs:
-        if os.path.exists(root_dir):
-            for dirpath, _, filenames in os.walk(root_dir):
-                # Don't go too deep to save time
-                if dirpath.count(os.sep) - root_dir.count(os.sep) > 3: continue
-
-                target = "javaw.exe" if sys.platform == "win32" else "java"
-                if target in filenames:
-                    java_paths.add(os.path.abspath(os.path.join(dirpath, target)))
-
-    # 4. Filter and Get Versions
-    results = []
-    for path in java_paths:
-        if not os.path.exists(path): continue
-        try:
-            # Run java -version to get the version string
-            proc = subprocess.run([path, "-version"], capture_output=True, text=True, timeout=2)
-            output = proc.stderr # Java version usually prints to stderr
-
-            # Parse version (e.g., "1.8.0_321" or "17.0.1")
-            version_match = re.search(r'version "([^"]+)"', output)
-            version_str = version_match.group(1) if version_match else "Unknown Version"
-
-            # Identify Arch (64-bit vs 32-bit)
-            arch = "64-bit" if "64-Bit" in output else "32-bit"
-
-            results.append({"path": path, "version": version_str, "arch": arch})
-        except:
-            continue
-
-    # Sort by version (descending roughly)
-    return sorted(results, key=lambda x: x['version'], reverse=True)
-
-
 def find_system_javas_enhanced(deep=False):
     """Improved scanner for Java installations.
 
@@ -410,6 +347,10 @@ class OrbusLauncher(ctk.CTk):
         self.progress_win = None
         self.tk_icon = None
 
+        # Drag and Drop state variables
+        self.drag_data = {"widget": None, "index": None, "start_y": 0}
+        self.instance_widgets = [] # We need to keep track of the button objects
+
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
@@ -434,8 +375,12 @@ class OrbusLauncher(ctk.CTk):
         self.import_btn = ctk.CTkButton(self.sidebar_frame, text="📥 Import .zip/.mrpack", command=self.import_modpack, fg_color="gray25")
         self.import_btn.grid(row=5, column=0, padx=20, pady=5)
 
+        # Rename button
+        self.rename_btn = ctk.CTkButton(self.sidebar_frame, text="✏️ Rename Instance", fg_color="#f5a623", hover_color="#d48a1f", command=self.rename_instance)
+        self.rename_btn.grid(row=6, column=0, padx=20, pady=5)
+
         self.del_btn = ctk.CTkButton(self.sidebar_frame, text="Delete Instance", fg_color="#cf3838", hover_color="#8a2525", command=self.delete_instance)
-        self.del_btn.grid(row=6, column=0, padx=20, pady=(10, 20))
+        self.del_btn.grid(row=7, column=0, padx=20, pady=(10, 5))
 
         # === MAIN PANEL ===
         self.main_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
@@ -594,10 +539,99 @@ class OrbusLauncher(ctk.CTk):
             self.loader_ver_combo.pack_forget()
 
     def refresh_instance_buttons(self):
-        for w in self.scrollable_list.winfo_children(): w.destroy()
-        for name in self.instances:
-            ctk.CTkButton(self.scrollable_list, text=name, fg_color="transparent", border_width=1, anchor="w",
-                          command=lambda n=name: self.select_instance(n)).pack(fill="x", pady=2)
+        # Clear existing widgets
+        for w in self.scrollable_list.winfo_children():
+            w.destroy()
+        
+        self.instance_widgets = []
+        self.scrollable_list.grid_columnconfigure(0, weight=1) # Make buttons expand
+
+        # Create buttons with Grid layout
+        keys = list(self.instances.keys())
+        for i, name in enumerate(keys):
+            btn = ctk.CTkButton(
+                self.scrollable_list, 
+                text=name, 
+                fg_color="transparent", 
+                border_width=1, 
+                anchor="w",
+                height=40,  # Fixed height helps with calculation
+                command=lambda n=name: self.select_instance(n)
+            )
+            # Use Grid instead of Pack for reordering capabilities
+            btn.grid(row=i, column=0, sticky="ew", pady=2)
+            
+            # Bind Mouse Events for Dragging
+            # We use a wrapper to pass the specific widget instance
+            btn.bind("<Button-1>", lambda event, b=btn, idx=i: self.on_drag_start(event, b, idx))
+            btn.bind("<B1-Motion>", lambda event: self.on_drag_motion(event))
+            btn.bind("<ButtonRelease-1>", self.on_drag_end)
+            
+            self.instance_widgets.append(btn)
+
+    def on_drag_start(self, event, widget, index):
+        # Record the item being dragged
+        self.drag_data["widget"] = widget
+        self.drag_data["index"] = index
+        self.drag_data["start_y"] = event.y_root
+        
+        # Visual feedback (optional): Change color to indicate dragging
+        widget.configure(fg_color="#3B8ED0")
+
+    def on_drag_motion(self, event):
+        if not self.drag_data["widget"]: return
+
+        # Calculate movement
+        dy = event.y_root - self.drag_data["start_y"]
+        current_index = self.drag_data["index"]
+        
+        # Threshold to trigger swap (approx height of button + padding)
+        # We set height=40 and pady=2, so ~44 pixels is one "slot"
+        slot_height = 44 
+
+        # Check if we moved down
+        if dy > slot_height / 2:
+            target_index = current_index + 1
+            if target_index < len(self.instance_widgets):
+                self.swap_widgets(current_index, target_index)
+                # Reset start_y so we can keep swapping if the user keeps dragging
+                self.drag_data["start_y"] += slot_height 
+                self.drag_data["index"] = target_index
+
+        # Check if we moved up
+        elif dy < -slot_height / 2:
+            target_index = current_index - 1
+            if target_index >= 0:
+                self.swap_widgets(current_index, target_index)
+                self.drag_data["start_y"] -= slot_height
+                self.drag_data["index"] = target_index
+
+    def swap_widgets(self, i1, i2):
+        # 1. Swap in the list of widgets
+        self.instance_widgets[i1], self.instance_widgets[i2] = self.instance_widgets[i2], self.instance_widgets[i1]
+        
+        # 2. Update the Grid Row to visually move them
+        self.instance_widgets[i1].grid(row=i1)
+        self.instance_widgets[i2].grid(row=i2)
+        
+        # 3. Update the binding indices so the next swap works correctly
+        # (We need to re-bind Button-1 so the index variable is correct for the next drag)
+        w1 = self.instance_widgets[i1]
+        w2 = self.instance_widgets[i2]
+        w1.bind("<Button-1>", lambda e, b=w1, idx=i1: self.on_drag_start(e, b, idx))
+        w2.bind("<Button-1>", lambda e, b=w2, idx=i2: self.on_drag_start(e, b, idx))
+
+    def on_drag_end(self, event):
+        if not self.drag_data["widget"]: return
+        
+        # Reset color
+        self.drag_data["widget"].configure(fg_color="transparent")
+        
+        # Commit the new order to self.instances and save config
+        new_order_keys = [w.cget("text") for w in self.instance_widgets]
+        self._reorder_instances(new_order_keys)
+        
+        self.drag_data = {"widget": None, "index": None, "start_y": 0}
 
     def select_instance(self, name):
         if self.current_instance_name: self.save_config()
@@ -633,6 +667,53 @@ class OrbusLauncher(ctk.CTk):
             self.current_instance_name = None
             self.save_config(); self.refresh_instance_buttons()
             self.header_label.configure(text="Select an Instance")
+
+    def rename_instance(self):
+        if not self.current_instance_name:
+            messagebox.showwarning("Warning", "Select an instance to rename.")
+            return
+        old_name = self.current_instance_name
+        new_name = simpledialog.askstring("Rename Instance", "New name for instance:", initialvalue=old_name)
+        if not new_name:
+            return
+        new_name = new_name.strip()
+        if new_name == old_name:
+            return
+        if new_name in self.instances:
+            messagebox.showerror("Error", f"An instance named '{new_name}' already exists.")
+            return
+        # Attempt to rename on disk (if present) and in config
+        old_folder = os.path.join(INSTANCES_DIR, old_name)
+        new_folder = os.path.join(INSTANCES_DIR, new_name)
+        try:
+            if os.path.exists(old_folder):
+                if os.path.exists(new_folder):
+                    messagebox.showerror("Error", f"A folder for '{new_name}' already exists on disk.")
+                    return
+                shutil.move(old_folder, new_folder)
+            self.instances[new_name] = self.instances.pop(old_name)
+            self.current_instance_name = new_name
+            self.save_config()
+            self.refresh_instance_buttons()
+            self.select_instance(new_name)
+        except Exception as e:
+            messagebox.showerror("Rename Error", str(e))
+
+    def _reorder_instances(self, new_order):
+        try:
+            old = self.instances.copy()
+            new = {}
+            for n in new_order:
+                new[n] = old[n]
+            self.instances = new
+            # preserve current selection
+            if self.current_instance_name not in self.instances:
+                self.current_instance_name = None
+            self.save_config(); self.refresh_instance_buttons()
+            if self.current_instance_name:
+                self.select_instance(self.current_instance_name)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to reorder instances: {e}")
 
     def open_mods_folder(self):
         if self.current_instance_name:
