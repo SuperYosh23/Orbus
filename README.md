@@ -23,7 +23,8 @@ It utilizes `minecraft-launcher-lib` for the heavy lifting and `CustomTkinter` f
 * **Live Console:** Optional log window to debug mods or watch game output in real-time.
 
 ## Screenshots
-<img width="905" height="743" alt="Screenshot_2026-01-17_20-21-48" src="https://github.com/user-attachments/assets/a0a1c210-287c-4ea8-ac3e-165f588c0b97" />
+<img width="905" height="743" alt="Screenshot_2026-01-17_20-25-03" src="https://github.com/user-attachments/assets/eec9a538-80ca-49c4-9cda-d52992fbee91" />
+
 
 
 ## Installation & Usage
