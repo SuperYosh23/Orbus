@@ -60,4 +60,4 @@ It utilizes `minecraft-launcher-lib` for the heavy lifting and `CustomTkinter` f
 - [ ] Auto-update functionality
 
 ## DISCLAIMER:
-This project is mostly entirely AI generated. Sorry if that bothers or upsets you.
+This project is almost entirely AI generated. Sorry if that bothers or upsets you.
