@@ -23,7 +23,7 @@ It utilizes `minecraft-launcher-lib` for the heavy lifting and `CustomTkinter` f
 * **Live Console:** Optional log window to debug mods or watch game output in real-time.
 
 ## Screenshots
-<img width="905" height="743" alt="Orbus Screenshot" src="https://github.com/user-attachments/assets/eec9a538-80ca-49c4-9cda-d52992fbee91" />
+<img width="925" height="1082" alt="Orbus Screenshot" src="https://github.com/SuperYosh23/Orbus/blob/main/a.png?raw=true" />
 
 ## Installation & Usage
 
