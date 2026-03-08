@@ -97,11 +97,12 @@ def find_system_javas_enhanced(deep=False):
 # Custom Scrollable Dropdown Widget
 # -------------------------
 class ScrollableComboBox(ctk.CTkFrame):
-    def __init__(self, master, width=200, height=30, values=[], command=None, **kwargs):
+    def __init__(self, master, width=200, height=30, values=[], command=None, corner_radius=None, **kwargs):
         super().__init__(master, width=width, height=height, fg_color="transparent", **kwargs)
         self.command = command
         self.values = values
         self.width = width
+        self.corner_radius = corner_radius
         self.is_open = False
         self.is_loading = False
         self.selected_value = values[0] if values else ""
@@ -110,7 +111,18 @@ class ScrollableComboBox(ctk.CTkFrame):
         self.button_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.button_frame.pack(fill="both", expand=True)
         
-        self.main_button = ctk.CTkButton(self.button_frame, text=self.selected_value, width=width-30, height=height, fg_color="gray20", hover_color="gray30", command=self.toggle_dropdown)
+        # Get corner radius from settings if not provided
+        if self.corner_radius is None:
+            # Try to get from parent's settings
+            try:
+                if hasattr(master, 'settings'):
+                    self.corner_radius = master.settings.get("corner_radius", 8)
+                else:
+                    self.corner_radius = 8
+            except:
+                self.corner_radius = 8
+        
+        self.main_button = ctk.CTkButton(self.button_frame, text=self.selected_value, width=width-30, height=height, fg_color="gray20", hover_color="gray30", corner_radius=self.corner_radius, command=self.toggle_dropdown)
         self.main_button.pack(side="left", fill="both", expand=True)
         
         # Loading spinner (hidden by default)
@@ -132,22 +144,47 @@ class ScrollableComboBox(ctk.CTkFrame):
         self.dropdown_window.geometry(f"{self.width}x300+{x}+{y}")
         self.dropdown_window.overrideredirect(True)
         self.dropdown_window.attributes('-topmost', True)
+        
+        # Create dropdown frame with corner radius
+        self.dropdown_frame = ctk.CTkFrame(self.dropdown_window, fg_color="gray20", corner_radius=self.corner_radius)
+        self.dropdown_frame.pack(fill="both", expand=True, padx=2, pady=2)
+        
         self.search_var = ctk.StringVar()
         self.search_var.trace("w", self.filter_options)
-        self.search_entry = ctk.CTkEntry(self.dropdown_window, placeholder_text="Type to search...", textvariable=self.search_var)
+        self.search_entry = ctk.CTkEntry(self.dropdown_frame, placeholder_text="Type to search...", textvariable=self.search_var, corner_radius=max(0, self.corner_radius-2))
         self.search_entry.pack(fill="x", padx=5, pady=5)
         self.search_entry.focus_set()
-        self.scroll_frame = ctk.CTkScrollableFrame(self.dropdown_window, width=self.width, height=250)
-        self.scroll_frame.pack(fill="both", expand=True)
+        self.scroll_frame = ctk.CTkScrollableFrame(self.dropdown_frame, width=self.width, height=250, fg_color="transparent")
+        self.scroll_frame.pack(fill="both", expand=True, padx=5, pady=(0, 5))
         self.populate_options(self.values)
         self.dropdown_window.bind("<FocusOut>", self._on_focus_out)
+        
+        # Bind global click to close dropdown when clicking outside using root tkinter widget
+        try:
+            # Get the root tkinter widget for global binding
+            root = self.winfo_toplevel()
+            while root.master:
+                root = root.master
+            self._global_click_binding = root.bind_all("<Button-1>", self._on_global_click)
+        except:
+            # Fallback: bind to the dropdown window itself
+            self._global_click_binding = self.dropdown_window.bind("<Button-1>", self._on_global_click)
 
     def _on_focus_out(self, event):
         if self.dropdown_window:
-            new_focus = event.widget.focus_get()
+            # Check if the new focus is still within our dropdown
             try:
-                if new_focus and (str(new_focus).startswith(str(self.dropdown_window))): return
-            except: pass
+                focused = self.focus_get()
+                if focused:
+                    # Check if focused widget is part of our dropdown
+                    focused_str = str(focused)
+                    dropdown_str = str(self.dropdown_window)
+                    if focused_str.startswith(dropdown_str):
+                        return  # Still focused within dropdown, don't close
+            except:
+                pass
+            
+            # If we get here, focus moved outside, so close dropdown
             self.close_dropdown()
 
     def populate_options(self, options):
@@ -160,7 +197,7 @@ class ScrollableComboBox(ctk.CTkFrame):
         else:
             # Create buttons more efficiently
             for val in options:
-                btn = ctk.CTkButton(self.scroll_frame, text=val, fg_color="transparent", text_color=("black", "white"), anchor="w", height=24, command=lambda v=val: self.select_option(v))
+                btn = ctk.CTkButton(self.scroll_frame, text=val, fg_color="transparent", text_color=("black", "white"), anchor="w", height=24, corner_radius=max(0, self.corner_radius-2), command=lambda v=val: self.select_option(v))
                 btn.pack(fill="x", pady=1)
 
     def filter_options(self, *args):
@@ -173,8 +210,39 @@ class ScrollableComboBox(ctk.CTkFrame):
         self.close_dropdown()
         if self.command: self.command(value)
 
+    def _on_global_click(self, event):
+        """Handle global clicks to close dropdown when clicking outside"""
+        if not self.dropdown_window:
+            return
+            
+        # Check if the clicked widget is part of our dropdown
+        clicked_widget = event.widget
+        try:
+            # Walk up the widget hierarchy to see if any parent is our dropdown
+            current = clicked_widget
+            while current:
+                if current == self.dropdown_window or current == self.dropdown_frame:
+                    return  # Clicked within dropdown, don't close
+                current = current.master
+        except:
+            pass
+        
+        # Clicked outside dropdown, close it
+        self.close_dropdown()
+
     def close_dropdown(self):
         if self.dropdown_window:
+            # Unbind global click handler
+            try:
+                if hasattr(self, '_global_click_binding'):
+                    # Get the root tkinter widget to unbind
+                    root = self.winfo_toplevel()
+                    while root.master:
+                        root = root.master
+                    root.unbind_all("<Button-1>", self._global_click_binding)
+            except:
+                pass
+                
             self.dropdown_window.destroy()
             self.dropdown_window = None
         self.is_open = False
@@ -183,7 +251,7 @@ class ScrollableComboBox(ctk.CTkFrame):
     def set(self, value):
         self.selected_value = value
         self.main_button.configure(text=value)
-    def configure(self, values=None):
+    def configure(self, values=None, corner_radius=None):
         if values is not None:
             self.values = values
             if self.selected_value not in values and values:
@@ -195,6 +263,10 @@ class ScrollableComboBox(ctk.CTkFrame):
                 self.show_loading_spinner()
             else:
                 self.hide_loading_spinner()
+        
+        if corner_radius is not None:
+            self.corner_radius = corner_radius
+            self.main_button.configure(corner_radius=corner_radius)
     
     def show_loading_spinner(self):
         """Show loading spinner and hide button text"""
@@ -210,6 +282,349 @@ class ScrollableComboBox(ctk.CTkFrame):
         self.loading_spinner.pack_forget()
         if self.selected_value:
             self.main_button.configure(text=self.selected_value)
+
+# -------------------------
+# Custom Themed Dialogs
+# -------------------------
+class ThemedDialog(ctk.CTkToplevel):
+    def __init__(self, master, title, message, button_text="OK", button_color="#3B8ED0", width=400, height=200):
+        super().__init__(master)
+        self.title(title)
+        self.geometry(f"{width}x{height}")
+        self.resizable(False, False)
+        self.transient(master)
+        
+        # Center the dialog
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.winfo_screenheight() // 2) - (height // 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
+        
+        # Main frame
+        main_frame = ctk.CTkFrame(self, fg_color="transparent")
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Message label
+        self.message_label = ctk.CTkLabel(main_frame, text=message, wraplength=width-60, justify="center", font=ctk.CTkFont(size=16))
+        self.message_label.pack(expand=True, pady=20)
+        
+        # Button frame
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(pady=10)
+        
+        # Action button
+        self.action_button = ctk.CTkButton(button_frame, text=button_text, fg_color="#3B8ED0", 
+                                         hover_color="#2E6DA4", command=self.on_action)
+        self.action_button.pack(side="right", padx=5)
+        
+        # Result
+        self.result = None
+        
+        # Schedule grab_set after window is visible
+        self.after(10, self._grab_focus)
+        
+    def _grab_focus(self):
+        """Set focus and grab after window is visible"""
+        try:
+            self.grab_set()
+            self.focus_set()
+        except:
+            pass  # Ignore if grab fails
+        
+    def _get_hover_color(self, color):
+        """Get a darker version of the color for hover effect"""
+        # Simple color darkening - you can make this more sophisticated
+        color_map = {
+            "#3B8ED0": "#2E6DA4",
+            "#1bd964": "#15a34a", 
+            "#cf3838": "#8a2525",
+            "#2d7a2d": "#1f5f1f"
+        }
+        return color_map.get(color, "#2E6DA4")
+    
+    def on_action(self):
+        self.result = True
+        self.destroy()
+    
+    def show(self):
+        self.wait_window()
+        return self.result
+
+class ThemedMessageBox(ThemedDialog):
+    def __init__(self, master, title, message, icon_type="info"):
+        colors = {
+            "info": "#3B8ED0",
+            "success": "#1bd964", 
+            "warning": "#f39c12",
+            "error": "#cf3838"
+        }
+        icons = {
+            "info": "ℹ️",
+            "success": "✅",
+            "warning": "⚠️", 
+            "error": "❌"
+        }
+        
+        super().__init__(master, title, f"{icons.get(icon_type, 'ℹ️')} {message}", 
+                        button_color=colors.get(icon_type, "#3B8ED0"))
+
+class ThemedYesNoDialog(ThemedDialog):
+    def __init__(self, master, title, message):
+        super().__init__(master, title, message, width=450, height=220)
+        
+        # Override button setup for Yes/No
+        button_frame = self.winfo_children()[0].winfo_children()[1]  # Get button frame
+        
+        # Clear existing button
+        for widget in button_frame.winfo_children():
+            widget.destroy()
+        
+        # Yes button
+        yes_btn = ctk.CTkButton(button_frame, text="Yes", fg_color="#1bd964", 
+                              hover_color="#15a34a", command=self.on_yes)
+        yes_btn.pack(side="right", padx=5)
+        
+        # No button  
+        no_btn = ctk.CTkButton(button_frame, text="No", fg_color="#cf3838", 
+                             hover_color="#8a2525", command=self.on_no)
+        no_btn.pack(side="right", padx=5)
+        
+        self.result = False
+    
+    def on_yes(self):
+        self.result = True
+        self.destroy()
+    
+    def on_no(self):
+        self.result = False
+        self.destroy()
+
+class ThemedInputDialog(ctk.CTkToplevel):
+    def __init__(self, master, title, prompt, initial_text=""):
+        super().__init__(master)
+        self.title(title)
+        self.geometry("400x200")
+        self.resizable(False, False)
+        self.transient(master)
+        
+        # Center the dialog
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() // 2) - 200
+        y = (self.winfo_screenheight() // 2) - 100
+        self.geometry(f"400x200+{x}+{y}")
+        
+        # Main frame
+        main_frame = ctk.CTkFrame(self, fg_color="transparent")
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Prompt label
+        prompt_label = ctk.CTkLabel(main_frame, text=prompt, wraplength=340, justify="center", font=ctk.CTkFont(size=16))
+        prompt_label.pack(pady=(20, 10))
+        
+        # Entry widget
+        self.entry = ctk.CTkEntry(main_frame, width=300)
+        self.entry.pack(pady=10)
+        self.entry.insert(0, initial_text)
+        
+        # Button frame
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(pady=10)
+        
+        # OK button
+        ok_btn = ctk.CTkButton(button_frame, text="OK", fg_color="#3B8ED0", 
+                              hover_color="#2E6DA4", command=self.on_ok)
+        ok_btn.pack(side="right", padx=5)
+        
+        # Cancel button
+        cancel_btn = ctk.CTkButton(button_frame, text="Cancel", fg_color="#cf3838", 
+                                 hover_color="#8a2525", command=self.on_cancel)
+        cancel_btn.pack(side="right", padx=5)
+        
+        # Result
+        self.result = None
+        
+        # Schedule grab_set after window is visible
+        self.after(10, self._grab_focus)
+        
+    def _grab_focus(self):
+        """Set focus and grab after window is visible"""
+        try:
+            self.grab_set()
+            self.entry.focus_set()
+        except:
+            pass  # Ignore if grab fails
+    
+    def on_ok(self):
+        self.result = self.entry.get()
+        self.destroy()
+    
+    def on_cancel(self):
+        self.result = None
+        self.destroy()
+    
+    def show(self):
+        self.wait_window()
+        return self.result
+
+# Custom dialog functions to replace messagebox
+def show_info(master, title, message):
+    dialog = ThemedMessageBox(master, title, message, "info")
+    dialog.show()
+
+def show_success(master, title, message):
+    dialog = ThemedMessageBox(master, title, message, "success") 
+    dialog.show()
+
+def show_warning(master, title, message):
+    dialog = ThemedMessageBox(master, title, message, "warning")
+    dialog.show()
+
+def show_error(master, title, message):
+    dialog = ThemedMessageBox(master, title, message, "error")
+    dialog.show()
+
+def ask_yes_no(master, title, message):
+    dialog = ThemedYesNoDialog(master, title, message)
+    return dialog.show()
+
+def ask_string(master, title, prompt, initial_text=""):
+    dialog = ThemedInputDialog(master, title, prompt, initial_text)
+    return dialog.show()
+# Custom Themed Context Menu
+# -------------------------
+class ThemedContextMenu(ctk.CTkToplevel):
+    def __init__(self, parent, x, y):
+        super().__init__(parent)
+        
+        # Store parent reference for cleanup
+        self.parent = parent
+        
+        # Remove window decorations
+        self.overrideredirect(True)
+        
+        # Set position
+        self.geometry(f"+{x}+{y}")
+        
+        # Make it stay on top
+        self.attributes('-topmost', True)
+        
+        # Main frame
+        self.frame = ctk.CTkFrame(self, fg_color="gray20", corner_radius=8)
+        self.frame.pack(padx=2, pady=2)
+        
+        # Menu items
+        self.menu_items = []
+        self.result = None
+        
+        # Schedule focus and grab after window is visible
+        self.after(10, self._setup_focus)
+        
+    def _setup_focus(self):
+        """Set focus and grab after window is visible"""
+        try:
+            self.grab_set()
+            self.focus_set()
+        except:
+            pass
+    
+    def add_command(self, label, command=None, icon=""):
+        """Add a menu item"""
+        item_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
+        item_frame.pack(fill="x", padx=5, pady=2)
+        
+        # Create button with icon if provided
+        text = f"  {icon} {label}" if icon else label
+        btn = ctk.CTkButton(
+            item_frame, 
+            text=text, 
+            fg_color="transparent", 
+            hover_color="gray30",
+            text_color=("gray10", "gray90"),
+            anchor="w",
+            height=30,
+            command=self._create_command(command, self.destroy)
+        )
+        btn.pack(fill="x", padx=5, pady=1)
+        
+        self.menu_items.append(btn)
+        
+    def add_separator(self):
+        """Add a separator"""
+        separator = ctk.CTkFrame(self.frame, height=1, fg_color="gray40")
+        separator.pack(fill="x", padx=10, pady=5)
+        
+    def _create_command(self, original_command, close_action):
+        """Create a wrapper command that closes the menu immediately and executes the original"""
+        def wrapped():
+            # Close menu immediately
+            close_action()
+            # Execute original command after a small delay to allow menu to close
+            if original_command:
+                self.after(10, original_command)
+        return wrapped
+    
+    def show(self):
+        """Show the menu and wait for it to close"""
+        # Bind events to close menu
+        self.bind("<FocusOut>", self._on_focus_out)
+        self.bind("<Escape>", lambda e: self.destroy())
+        
+        # Bind to parent window to detect clicks outside
+        self.master.bind("<Button-1>", self._on_parent_click)
+        self.master.bind("<FocusIn>", self._on_parent_focus_in)
+        
+    def _on_focus_out(self, event):
+        """Close menu when losing focus"""
+        try:
+            # Check if focus went to something outside our menu
+            focused = self.focus_get()
+            if not focused or not self._is_child_of(focused, self):
+                self.destroy()
+        except:
+            pass
+    
+    def _on_parent_click(self, event):
+        """Close menu when parent window is clicked"""
+        try:
+            # Check if the clicked widget is not part of our menu
+            if not self._is_child_of(event.widget, self) and not self._is_child_of(event.widget, self.frame):
+                self.destroy()
+        except:
+            pass
+    
+    def _on_parent_focus_in(self, event):
+        """Close menu when parent window regains focus"""
+        try:
+            focused = self.focus_get()
+            if focused and not self._is_child_of(focused, self):
+                self.destroy()
+        except:
+            pass
+    
+    def _is_child_of(self, widget, parent):
+        """Check if a widget is a child of another widget"""
+        try:
+            current = widget
+            while current:
+                if current == parent:
+                    return True
+                current = current.master
+            return False
+        except:
+            return False
+    
+    def destroy(self):
+        """Override destroy to cleanup parent bindings"""
+        try:
+            # Unbind parent window events
+            if hasattr(self, 'parent') and self.parent:
+                self.parent.unbind("<Button-1>", self._on_parent_click)
+                self.parent.unbind("<FocusIn>", self._on_parent_focus_in)
+        except:
+            pass
+        
+        # Call parent destroy method
+        super().destroy()
 
 # -------------------------
 # Main App
@@ -271,10 +686,24 @@ class OrbusLauncher(ctk.CTk):
         self.scrollable_list = ctk.CTkScrollableFrame(self.sidebar_frame, label_text="")
         self.scrollable_list.grid(row=3, column=0, padx=15, pady=(5, 10), sticky="nsew")
 
-        self.import_btn = ctk.CTkButton(self.sidebar_frame, text="📥 Import .zip/.mrpack", command=self.import_modpack, fg_color="gray25")
+        self.import_btn = ctk.CTkButton(self.sidebar_frame, text="↓ Import .zip/.mrpack", command=self.import_modpack, fg_color="gray25")
         self.import_btn.grid(row=4, column=0, padx=20, pady=5)
 
-        self.browse_btn = ctk.CTkButton(self.sidebar_frame, text="🌐 Browse Modrinth", fg_color="gray25", hover_color="gray15", command=self.open_modrinth_search)
+        # Setup mod icon for Browse Modrinth button
+        mod_icon_path = self.get_mod_icon()
+        mod_icon_img = None
+        btn_text = "Browse Modrinth"
+        
+        if mod_icon_path and os.path.exists(mod_icon_path):
+            try:
+                pil_img = Image.open(mod_icon_path)
+                mod_icon_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(20, 20))
+            except: pass
+        else:
+            # Use globe emoji as fallback
+            btn_text = "🌐 Browse Modrinth"
+
+        self.browse_btn = ctk.CTkButton(self.sidebar_frame, text=btn_text, image=mod_icon_img, compound="left", fg_color="gray25", hover_color="#2d7a2d", command=self.open_modrinth_search)
         self.browse_btn.grid(row=5, column=0, padx=20, pady=5)
 
         self.settings_btn = ctk.CTkButton(self.sidebar_frame, text="⚙️ Settings", command=self.open_settings, fg_color="gray25")
@@ -299,7 +728,7 @@ class OrbusLauncher(ctk.CTk):
         self.version_combo.pack(fill="x", padx=20, pady=(5, 10))
 
         ctk.CTkLabel(self.settings_frame, text="Mod Loader").pack(anchor="w", padx=20)
-        self.loader_combo = ctk.CTkComboBox(self.settings_frame, values=["Vanilla", "Fabric", "Quilt"], command=self.toggle_loader_settings)
+        self.loader_combo = ScrollableComboBox(self.settings_frame, values=["Vanilla", "Fabric", "Quilt"], command=self.toggle_loader_settings)
         self.loader_combo.pack(fill="x", padx=20, pady=(5, 10))
 
         self.loader_ver_label = ctk.CTkLabel(self.settings_frame, text="Fabric Loader Version")
@@ -326,9 +755,9 @@ class OrbusLauncher(ctk.CTk):
         self.logs_chk = ctk.CTkCheckBox(self.settings_frame, text="Show Console Logs", variable=self.show_logs_var)
         self.logs_chk.pack(anchor="w", padx=20, pady=(10, 5))
 
-        self.folder_btn = ctk.CTkButton(self.settings_frame, text="📂 Open Instance Folder", command=self.open_instance_folder, fg_color="gray30")
+        self.folder_btn = ctk.CTkButton(self.settings_frame, text="▤ Open Instance Folder", command=self.open_instance_folder, fg_color="gray30")
         self.folder_btn.pack(fill="x", padx=20, pady=(10, 5))
-        self.mods_btn = ctk.CTkButton(self.settings_frame, text="🧩 Open Mods Folder", command=self.open_mods_folder, fg_color="gray30")
+        self.mods_btn = ctk.CTkButton(self.settings_frame, text="⧉ Open Mods Folder", command=self.open_mods_folder, fg_color="gray30")
         self.mods_btn.pack(fill="x", padx=20, pady=(0, 20))
 
         self.status_label = ctk.CTkLabel(self.main_frame, text="Ready", text_color="gray")
@@ -406,6 +835,48 @@ class OrbusLauncher(ctk.CTk):
             logo_img = ctk.CTkImage(light_image=Image.open(ICON_PATH), dark_image=Image.open(ICON_PATH), size=(60, 60))
             self.logo_label.configure(image=logo_img, text="")
         except: pass
+
+    def get_default_icon(self):
+        """Get default icon for new instances"""
+        mine_icon_path = os.path.join(MINECRAFT_DIR, "mine.png")
+        
+        # Check if mine.png exists
+        if os.path.exists(mine_icon_path):
+            return mine_icon_path
+        
+        # Try to download the default icon
+        try:
+            response = requests.get("https://gyazo.com/a4abc5fdb965d1b97db38453012efc73/thumb/1000", timeout=10)
+            if response.status_code == 200:
+                with open(mine_icon_path, 'wb') as f:
+                    f.write(response.content)
+                return mine_icon_path
+        except:
+            pass
+        
+        # Fallback to empty string (will use game controller emoji in UI)
+        return ""
+
+    def get_mod_icon(self):
+        """Get mod icon for Browse Modrinth button"""
+        mod_icon_path = os.path.join(MINECRAFT_DIR, "mod.png")
+        
+        # Check if mod.png exists
+        if os.path.exists(mod_icon_path):
+            return mod_icon_path
+        
+        # Try to download the mod icon
+        try:
+            response = requests.get("https://cdn2.steamgriddb.com/icon/46bbc4a56de136ad319e59e37ef55644/32/256x256.png", timeout=10)
+            if response.status_code == 200:
+                with open(mod_icon_path, 'wb') as f:
+                    f.write(response.content)
+                return mod_icon_path
+        except:
+            pass
+        
+        # Fallback to empty string (will use globe emoji in UI)
+        return ""
 
     def browse_java_path(self):
         filename = filedialog.askopenfilename(filetypes=[("Java Executable", "java javaw java.exe javaw.exe"), ("All Files", "*.*")])
@@ -587,12 +1058,12 @@ class OrbusLauncher(ctk.CTk):
         self.apply_logo_visibility()
         
         # Show success message
-        messagebox.showinfo("Settings", "Settings saved successfully!")
+        show_success(self, "Settings", "Settings saved successfully!")
         self.settings_win.destroy()
     
     def reset_settings(self):
         """Reset settings to defaults"""
-        if messagebox.askyesno("Reset Settings", "Are you sure you want to reset all settings to defaults?"):
+        if ask_yes_no(self, "Reset Settings", "Are you sure you want to reset all settings to defaults?"):
             # Reset to defaults - create fresh default settings
             default_settings = {
                 "corner_radius": 8,
@@ -620,12 +1091,11 @@ class OrbusLauncher(ctk.CTk):
             # Save the reset settings
             self.save_settings()
             
-            messagebox.showinfo("Settings", "Settings reset to defaults!")
-    
+            show_success(self, "Settings", "Settings reset to defaults!")
+
     def apply_corner_radius(self):
         """Apply corner radius to all relevant widgets"""
         radius = self.settings["corner_radius"]
-        
         # Apply to main buttons
         for widget in [self.browse_btn, self.import_btn, self.settings_btn, self.add_instance_btn, self.launch_btn]:
             widget.configure(corner_radius=radius)
@@ -637,7 +1107,12 @@ class OrbusLauncher(ctk.CTk):
         # Apply to other UI elements
         for widget in [self.username_entry, self.java_entry, self.ram_slider]:
             widget.configure(corner_radius=radius)
-    
+        
+        # Apply to ScrollableComboBox widgets
+        for widget in [self.version_combo, self.loader_combo, self.loader_ver_combo]:
+            if hasattr(widget, 'configure'):
+                widget.configure(corner_radius=radius)
+
     def apply_sidebar_position(self):
         """Apply sidebar position setting"""
         position = self.settings["sidebar_position"]
@@ -678,15 +1153,20 @@ class OrbusLauncher(ctk.CTk):
         for i, name in enumerate(keys):
             icon_img = None
             icon_path = self.instances[name].get("icon_path")
+            btn_text = name
+            
             if icon_path and os.path.exists(icon_path):
                 try:
                     pil_img = Image.open(icon_path)
                     icon_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(24, 24))
                 except: pass
+            else:
+                # Use game controller emoji as fallback
+                btn_text = f"🎮 {name}"
 
             btn = ctk.CTkButton(
                 self.scrollable_list, 
-                text=name, 
+                text=btn_text, 
                 image=icon_img,
                 compound="left",
                 fg_color="transparent", 
@@ -713,35 +1193,24 @@ class OrbusLauncher(ctk.CTk):
     def show_context_menu(self, event, instance_name):
         # 1. Close any existing menu
         if self.context_menu_ref:
-            try: self.context_menu_ref.unpost()
+            try: self.context_menu_ref.destroy()
             except: pass
         
-        # 2. Create new menu
-        menu = Menu(self, tearoff=0)
-        menu.add_command(label="Rename Instance", command=lambda: self.rename_instance(instance_name))
-        menu.add_command(label="Change Instance Icon", command=lambda: self.change_instance_icon(instance_name))
+        # 2. Create new themed context menu
+        menu = ThemedContextMenu(self, event.x_root, event.y_root)
+        
+        # Add menu items with icons
+        menu.add_command("Rename Instance", lambda: self.rename_instance(instance_name), "")
+        menu.add_command("Change Instance Icon", lambda: self.change_instance_icon(instance_name), "")
         menu.add_separator()
-        menu.add_command(label="Delete Instance", command=lambda: self.delete_instance(instance_name))
+        menu.add_command("Delete Instance", lambda: self.delete_instance(instance_name), "")
         
         self.context_menu_ref = menu
         
-        # 3. Post the menu at coordinates
-        menu.post(event.x_root, event.y_root)
-
-        # 4. Bind a generic click to the entire window to close the menu
-        # 'add=+' ensures we don't overwrite other click functionality in the app
-        self.bind("<Button-1>", self.close_context_menu, add="+")
-
-    def close_context_menu(self, event=None):
-        if self.context_menu_ref:
-            try: self.context_menu_ref.unpost()
-            except: pass
-            self.context_menu_ref = None
-        # Clean up the binding so we don't keep firing this function
-        self.unbind("<Button-1>")
+        # 3. Show the menu
+        menu.show()
 
     def change_instance_icon(self, name):
-        self.close_context_menu()
         file_path = filedialog.askopenfilename(
             title="Select Icon",
             filetypes=[("Images", "*.png *.jpg *.jpeg *.ico *.bmp")]
@@ -759,7 +1228,7 @@ class OrbusLauncher(ctk.CTk):
                 self.save_config()
                 self.refresh_instance_buttons()
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to set icon: {e}")
+                show_error(self, "Error", f"Failed to set icon: {e}")
 
     # --- Drag & Drop Logic ---
     def on_drag_start(self, event, widget, index):
@@ -767,7 +1236,10 @@ class OrbusLauncher(ctk.CTk):
         self.drag_data["index"] = index
         self.drag_data["start_y"] = event.y_root
         widget.configure(fg_color="#3B8ED0")
-        self.close_context_menu() # Safety close
+        # Close any existing context menu when starting drag
+        if self.context_menu_ref:
+            try: self.context_menu_ref.destroy()
+            except: pass
 
     def on_drag_motion(self, event):
         if not self.drag_data["widget"]: return
@@ -821,7 +1293,7 @@ class OrbusLauncher(ctk.CTk):
         self.update_main_view()
 
     def add_instance(self):
-        n = simpledialog.askstring("New", "Instance Name:")
+        n = ask_string(self, "New Instance", "Instance Name:")
         if n and n not in self.instances:
             # Use default username from settings file
             self.instances[n] = {
@@ -831,7 +1303,7 @@ class OrbusLauncher(ctk.CTk):
                 "loader_version": "latest", 
                 "ram": 4, 
                 "java_path": "", 
-                "icon_path": "",
+                "icon_path": self.get_default_icon(),
                 "show_console_logs": False
             }
             self.save_config(); self.refresh_instance_buttons(); self.select_instance(n)
@@ -855,7 +1327,7 @@ class OrbusLauncher(ctk.CTk):
             "loader_version": "latest", 
             "ram": 4, 
             "java_path": "", 
-            "icon_path": "",
+            "icon_path": self.get_default_icon(),
             "show_console_logs": False
         }
         self.save_config(); self.refresh_instance_buttons(); self.select_instance(n)
@@ -863,7 +1335,7 @@ class OrbusLauncher(ctk.CTk):
     def delete_instance(self, instance_name=None):
         target = instance_name if instance_name else self.current_instance_name
         if not target: return
-        if messagebox.askyesno("Confirm", f"Delete '{target}'?"):
+        if ask_yes_no(self, "Confirm", f"Delete '{target}'?"):
             if target in self.instances: del self.instances[target]
             folder = os.path.join(INSTANCES_DIR, target)
             if os.path.exists(folder): shutil.rmtree(folder, ignore_errors=True)
@@ -873,19 +1345,18 @@ class OrbusLauncher(ctk.CTk):
             self.save_config(); self.refresh_instance_buttons()
 
     def rename_instance(self, target_name=None):
-        self.close_context_menu()
         target = target_name if target_name else self.current_instance_name
         
         if not target:
-            messagebox.showwarning("Warning", "Select an instance to rename.")
+            show_warning(self, "Warning", "Select an instance to rename.")
             return
 
-        new_name = simpledialog.askstring("Rename Instance", f"Rename '{target}' to:", initialvalue=target)
+        new_name = ask_string(self, "Rename Instance", f"Rename '{target}' to:", initial_text=target)
         if not new_name: return
         new_name = new_name.strip()
         if new_name == target: return
         if new_name in self.instances:
-            messagebox.showerror("Error", f"'{new_name}' already exists.")
+            show_error(self, "Error", f"'{new_name}' already exists.")
             return
 
         old_folder = os.path.join(INSTANCES_DIR, target)
@@ -893,7 +1364,7 @@ class OrbusLauncher(ctk.CTk):
         try:
             if os.path.exists(old_folder):
                 if os.path.exists(new_folder):
-                    messagebox.showerror("Error", "Target folder already exists.")
+                    show_error(self, "Error", "Target folder already exists.")
                     return
                 shutil.move(old_folder, new_folder)
             
@@ -912,7 +1383,7 @@ class OrbusLauncher(ctk.CTk):
                 self.select_instance(new_name)
                 
         except Exception as e:
-            messagebox.showerror("Rename Error", str(e))
+            show_error(self, "Rename Error", "An error occurred while renaming the instance.")
 
     def _reorder_instances(self, new_order):
         try:
@@ -949,7 +1420,7 @@ class OrbusLauncher(ctk.CTk):
         self.search_entry = ctk.CTkEntry(container, placeholder_text="Search modpacks...")
         self.search_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
         self.search_entry.bind("<Return>", lambda e: self.perform_modrinth_search())
-        ctk.CTkButton(container, text="Search", command=self.perform_modrinth_search).pack(side="right")
+        ctk.CTkButton(container, text="Search", fg_color="#2d7a2d", hover_color="#1f5f1f", command=self.perform_modrinth_search).pack(side="right")
         self.results_frame = ctk.CTkScrollableFrame(self.search_win, label_text="Results")
         self.results_frame.pack(fill="both", expand=True, padx=20, pady=(0, 20))
         self.perform_modrinth_search(True)
@@ -963,7 +1434,7 @@ class OrbusLauncher(ctk.CTk):
         loading_frame.pack(fill="x", pady=20)
         loading_label = ctk.CTkLabel(loading_frame, text="🔍 Searching Modrinth...", font=ctk.CTkFont(size=14))
         loading_label.pack()
-        loading_spinner = ctk.CTkProgressBar(loading_frame, width=200)
+        loading_spinner = ctk.CTkProgressBar(loading_frame, width=200, progress_color="#2d7a2d")
         loading_spinner.pack(pady=10)
         loading_spinner.configure(mode="indeterminate")
         loading_spinner.start()
@@ -1071,7 +1542,7 @@ class OrbusLauncher(ctk.CTk):
         threading.Thread(target=self.load_project_versions, args=(h['project_id'], version_combo), daemon=True).start()
         
         # Install button
-        install_btn = ctk.CTkButton(fr, text="Install", width=80, command=lambda cb=version_combo: self.install_from_modrinth(cb))
+        install_btn = ctk.CTkButton(fr, text="Install", width=80, fg_color="#2d7a2d", hover_color="#1f5f1f", command=lambda cb=version_combo: self.install_from_modrinth(cb))
         install_btn.pack(side="right", padx=10)
 
         # Load icon
@@ -1117,7 +1588,7 @@ class OrbusLauncher(ctk.CTk):
     def install_from_modrinth(self, version_combo):
         selected_version = version_combo.get()
         if not selected_version or selected_version == "Loading..." or selected_version == "Error loading versions":
-            messagebox.showerror("Error", "Please select a valid version")
+            show_error(self, "Error", "Please select a valid version")
             return
         
         def run():
@@ -1133,7 +1604,7 @@ class OrbusLauncher(ctk.CTk):
                 # Pass additional info for icon handling
                 self.process_modpack(temp_path, version_combo.title, version_combo.icon_url)
             except Exception as e:
-                self.after(0, lambda: messagebox.showerror("Error", str(e)))
+                self.after(0, lambda: show_error(self, "Error", str(e)))
         threading.Thread(target=run, daemon=True).start()
 
     def install_mrpack(self, z, pack_title=None, icon_url=None):
@@ -1142,7 +1613,7 @@ class OrbusLauncher(ctk.CTk):
         d = idx["dependencies"]
         ldr = "Fabric" if "fabric-loader" in d else "Quilt" if "quilt-loader" in d else "Vanilla"
         
-        # Download and save icon if available
+        # Download and save icon if available, otherwise use default
         icon_path = ""
         if icon_url:
             try:
@@ -1155,6 +1626,10 @@ class OrbusLauncher(ctk.CTk):
                         f.write(icon_response.content)
             except:
                 pass  # Icon download failed, continue without it
+        
+        # If no icon was successfully downloaded, use default icon
+        if not icon_path:
+            icon_path = self.get_default_icon()
         
         # Use default username from settings file
         self.instances[n] = {
@@ -1196,7 +1671,7 @@ class OrbusLauncher(ctk.CTk):
             self.save_config()
             self.launch_btn.configure(state="disabled", text="Launching...")
             threading.Thread(target=self.launch, daemon=True).start()
-        else: messagebox.showwarning("Warning", "Select an instance.")
+        else: show_warning(self, "Warning", "Select an instance.")
 
     def launch(self):
         try:
@@ -1252,7 +1727,7 @@ class OrbusLauncher(ctk.CTk):
                     self.after(0, lambda: self.status_label.configure(text="Ready"))
             check_alive()
         except Exception as e:
-            self.after(0, lambda: messagebox.showerror("Launch Error", str(e)))
+            self.after(0, lambda: show_error(self, "Launch Error", str(e)))
             self.after(0, lambda: self.launch_btn.configure(state="normal", text="LAUNCH GAME"))
 
     # --- Java Auto Detect ---
@@ -1326,11 +1801,60 @@ class OrbusLauncher(ctk.CTk):
                 if "modrinth.index.json" in z.namelist(): self.install_mrpack(z, pack_title, icon_url)
                 else: self.install_basic_zip(z, path, pack_title, icon_url)
             self.after(0, self.cleanup_installation)
-        except Exception as e: self.after(0, lambda: messagebox.showerror("Error", str(e)))
+        except Exception as e: self.after(0, lambda: show_error(self, "Error", str(e)))
+
+    def install_basic_zip(self, z, path, pack_title=None, icon_url=None):
+        """Install basic zip modpack without modrinth.index.json"""
+        # Extract filename without extension as default name
+        filename = os.path.basename(path)
+        name = pack_title or os.path.splitext(filename)[0] or "Imported Pack"
+        
+        # Use default icon since basic zips don't have icon info
+        icon_path = self.get_default_icon()
+        
+        # Use default username from settings file
+        self.instances[name] = {
+            "username": self.settings.get("default_username", ""),
+            "version": "1.21.1", 
+            "loader": "Vanilla", 
+            "loader_version": "latest", 
+            "ram": 4, 
+            "java_path": "", 
+            "icon_path": icon_path,
+            "show_console_logs": False
+        }
+        self.save_config()
+        
+        # Extract all files to instance directory
+        instance_dir = os.path.join(INSTANCES_DIR, name)
+        os.makedirs(instance_dir, exist_ok=True)
+        
+        # Extract all files from zip
+        for file in z.namelist():
+            if file.startswith("overrides/"):
+                # Handle overrides folder
+                rel_path = file.replace("overrides/", "")
+                if rel_path:
+                    dest = os.path.join(instance_dir, rel_path)
+                    if file.endswith("/"): 
+                        os.makedirs(dest, exist_ok=True)
+                    else:
+                        os.makedirs(os.path.dirname(dest), exist_ok=True)
+                        with open(dest, "wb") as f: 
+                            f.write(z.read(file))
+            elif not file.startswith("modrinth.index.json"):
+                # Handle other files (excluding modrinth index)
+                dest = os.path.join(instance_dir, file)
+                if file.endswith("/"): 
+                    os.makedirs(dest, exist_ok=True)
+                else:
+                    os.makedirs(os.path.dirname(dest), exist_ok=True)
+                    with open(dest, "wb") as f: 
+                        f.write(z.read(file))
 
     def cleanup_installation(self):
         if self.progress_win: self.progress_win.destroy()
-        self.refresh_instance_buttons(); messagebox.showinfo("Success", "Done!")
+        self.refresh_instance_buttons(); show_success(self, "Success", "Done!")
 
 if __name__ == "__main__":
     app = OrbusLauncher()
