@@ -253,7 +253,8 @@ class OrbusLauncher(ctk.CTk):
 
         self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="O", font=ctk.CTkFont(size=32, weight="bold"))
         self.logo_label.grid(row=0, column=0, pady=(20, 5))
-        ctk.CTkLabel(self.sidebar_frame, text="ORBUS", font=ctk.CTkFont(size=26, weight="bold")).grid(row=1, column=0, pady=(0, 20))
+        self.orbus_text_label = ctk.CTkLabel(self.sidebar_frame, text="ORBUS", font=ctk.CTkFont(size=26, weight="bold"))
+        self.orbus_text_label.grid(row=1, column=0, pady=(0, 20))
 
         # Custom header for instances with + button
         self.instances_header_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
@@ -355,6 +356,7 @@ class OrbusLauncher(ctk.CTk):
         # Apply settings on startup
         self.apply_corner_radius()
         self.apply_sidebar_position()
+        self.apply_logo_visibility()
         
         # Show correct initial view
         self.update_main_view()
@@ -435,7 +437,10 @@ class OrbusLauncher(ctk.CTk):
         default_settings = {
             "corner_radius": 8,
             "sidebar_position": "left",
-            "default_username": ""
+            "default_username": "",
+            "sidebar_width": 220,
+            "sidebar_collapsed": False,
+            "show_logo": True
         }
         
         if os.path.exists(SETTINGS_FILE):
@@ -513,6 +518,14 @@ class OrbusLauncher(ctk.CTk):
         sidebar_right_radio = ctk.CTkRadioButton(sidebar_frame, text="Right", variable=self.sidebar_var, value="right")
         sidebar_right_radio.pack(side="left", padx=5)
         
+        # Logo Visibility
+        logo_frame = ctk.CTkFrame(appearance_tab, fg_color="transparent")
+        logo_frame.pack(fill="x", padx=20, pady=10)
+        
+        self.show_logo_var = ctk.BooleanVar(value=self.settings.get("show_logo", True))
+        logo_checkbox = ctk.CTkCheckBox(logo_frame, text="Show Orbus Logo", variable=self.show_logo_var)
+        logo_checkbox.pack(side="left", padx=10)
+        
         # Default Settings Tab
         defaults_tab = settings_tabview.add("Defaults")
         
@@ -559,6 +572,7 @@ class OrbusLauncher(ctk.CTk):
         self.settings["corner_radius"] = int(self.button_radius_slider.get())
         self.settings["sidebar_position"] = self.sidebar_var.get()
         self.settings["default_username"] = self.default_username_entry.get()
+        self.settings["show_logo"] = self.show_logo_var.get()
         
         # Save to file
         self.save_settings()
@@ -569,6 +583,9 @@ class OrbusLauncher(ctk.CTk):
         # Apply sidebar position
         self.apply_sidebar_position()
         
+        # Apply logo visibility
+        self.apply_logo_visibility()
+        
         # Show success message
         messagebox.showinfo("Settings", "Settings saved successfully!")
         self.settings_win.destroy()
@@ -576,14 +593,32 @@ class OrbusLauncher(ctk.CTk):
     def reset_settings(self):
         """Reset settings to defaults"""
         if messagebox.askyesno("Reset Settings", "Are you sure you want to reset all settings to defaults?"):
-            # Reset to defaults
-            self.settings = self.load_settings()
+            # Reset to defaults - create fresh default settings
+            default_settings = {
+                "corner_radius": 8,
+                "sidebar_position": "left",
+                "default_username": "",
+                "sidebar_width": 220,
+                "sidebar_collapsed": False,
+                "show_logo": True
+            }
+            self.settings = default_settings
             
-            # Update UI elements
+            # Update UI elements in settings window
             self.button_radius_slider.set(self.settings["corner_radius"])
+            self.update_settings_label("button", self.settings["corner_radius"])  # Update the label
             self.sidebar_var.set(self.settings["sidebar_position"])
             self.default_username_entry.delete(0, 'end')
             self.default_username_entry.insert(0, self.settings["default_username"])
+            self.show_logo_var.set(self.settings["show_logo"])
+            
+            # Apply the reset settings to the main UI
+            self.apply_corner_radius()
+            self.apply_sidebar_position()
+            self.apply_logo_visibility()
+            
+            # Save the reset settings
+            self.save_settings()
             
             messagebox.showinfo("Settings", "Settings reset to defaults!")
     
@@ -619,6 +654,19 @@ class OrbusLauncher(ctk.CTk):
             self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
             self.main_frame.grid_forget()
             self.main_frame.grid(row=0, column=1, sticky="nsew", padx=(30, 30), pady=30)
+
+    def apply_logo_visibility(self):
+        """Apply logo visibility setting"""
+        show_logo = self.settings.get("show_logo", True)
+        
+        if show_logo:
+            # Show logo and text in their original positions
+            self.logo_label.grid(row=0, column=0, pady=(20, 5))
+            self.orbus_text_label.grid(row=1, column=0, pady=(0, 20))
+        else:
+            # Hide logo and text
+            self.logo_label.grid_forget()
+            self.orbus_text_label.grid_forget()
 
     # --- Instance Buttons with Icons & Context Menu ---
     def refresh_instance_buttons(self):
