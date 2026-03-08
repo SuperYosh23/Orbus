@@ -1700,10 +1700,17 @@ class OrbusLauncher(ctk.CTk):
             set_st("Launching...")
             if custom_java and os.path.exists(custom_java): 
                 java = custom_java
+                print(f"Using custom Java path: {java}")
             else:
-                java_path = shutil.which("javaw") or shutil.which("java")
+                # On Linux, prioritize 'java' over 'javaw' (which is Windows-specific)
+                if sys.platform.startswith("linux"):
+                    java_path = shutil.which("java") or shutil.which("javaw")
+                else:
+                    java_path = shutil.which("javaw") or shutil.which("java")
+                
                 if java_path:
                     java = os.path.abspath(java_path)
+                    print(f"Found Java in PATH: {java}")
                 else:
                     raise Exception(f"Java not found in PATH. Please install Java or specify the Java executable path manually.\nCurrent PATH: {os.environ.get('PATH', 'Not set')}")
             jvm_args = [f"-Xmx{ram}G", f"-Xms{ram}G", "-XX:+UseG1GC"]
