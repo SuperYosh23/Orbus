@@ -23,7 +23,7 @@ It utilizes `minecraft-launcher-lib` for the heavy lifting and `CustomTkinter` f
 * **Live Console:** Optional log window to debug mods or watch game output in real-time.
 
 ## Screenshots
-Screenshot is from Orbus release v3.5.0
+Screenshot is from Orbus release v3.5.0 with default settings on Linux x86_64
 <img width="925" height="1082" alt="Orbus Screenshot" src="https://github.com/SuperYosh23/Orbus/blob/main/a.png?raw=true" />
 
 ## Installation & Usage
