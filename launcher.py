@@ -1698,8 +1698,14 @@ class OrbusLauncher(ctk.CTk):
                 minecraft_launcher_lib.quilt.install_quilt(v, MINECRAFT_DIR)
                 l_id = f"quilt-loader-{v}"
             set_st("Launching...")
-            if custom_java and os.path.exists(custom_java): java = custom_java
-            else: java = shutil.which("javaw") or shutil.which("java") or "java"
+            if custom_java and os.path.exists(custom_java): 
+                java = custom_java
+            else:
+                java_path = shutil.which("javaw") or shutil.which("java")
+                if java_path:
+                    java = os.path.abspath(java_path)
+                else:
+                    raise Exception(f"Java not found in PATH. Please install Java or specify the Java executable path manually.\nCurrent PATH: {os.environ.get('PATH', 'Not set')}")
             jvm_args = [f"-Xmx{ram}G", f"-Xms{ram}G", "-XX:+UseG1GC"]
             opts = {"username": user, "uuid": "0", "token": "0", "gameDir": inst_dir, "executablePath": java, "jvmArguments": jvm_args}
             cmd = minecraft_launcher_lib.command.get_minecraft_command(l_id, MINECRAFT_DIR, opts)
