@@ -55,9 +55,7 @@ Screenshot is from Orbus release v3.5.0 with default settings on Linux x86_64
 * [Modrinth API](https://docs.modrinth.com/) - For modpack browsing.
 
 ## To-Do / Roadmap
-- [ ] Microsoft Account Login support
 - [ ] CurseForge Modpack support
-- [ ] Skin management
 - [ ] Auto-update functionality
 
 ## DISCLAIMER:
