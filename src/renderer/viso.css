@@ -44,9 +44,10 @@
     --viso-surface: rgba(22, 27, 34, 0.85);  /* Glassmorphism surface */
 
     /* Accent Colors - CUSTOMIZE THESE */
-    --viso-accent: #3ddc84;           /* Primary accent - vibrant green */
-    --viso-accent-dim: #2ea043;       /* Hover/active states - darker shade */
-    --viso-accent-glow: rgba(61, 220, 132, 0.4);  /* Glow effects - same hue, 40% opacity */
+    /* Orbus Blue Theme - matching original CustomTkinter blue */
+    --viso-accent: #3B8ED0;           /* Primary accent - CustomTkinter blue */
+    --viso-accent-dim: #2E6DA4;       /* Hover/active states - darker blue */
+    --viso-accent-glow: rgba(59, 142, 208, 0.4);  /* Glow effects - same hue, 40% opacity */
 
     /* Semantic Colors */
     --viso-gold: #ffd700;             /* Success, achievement, premium */
