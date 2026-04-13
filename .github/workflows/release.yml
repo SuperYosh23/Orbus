@@ -55,7 +55,17 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.os }}-build
-        path: dist/
+        path: |
+          dist/*.AppImage
+          dist/*.exe
+          dist/*.dmg
+          dist/*.snap
+          dist/*.deb
+          dist/*.rpm
+          dist/*.zip
+          dist/*.pkg
+          dist/*.tar.gz
+          dist/latest*.yml
 
   release:
     needs: build
@@ -74,9 +84,7 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          artifacts/ubuntu-latest-build/**
-          artifacts/windows-latest-build/**
-          artifacts/macos-latest-build/**
+          artifacts/**/*
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
