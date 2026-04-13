@@ -321,13 +321,13 @@ function setupEventListeners() {
     // Folder buttons
     document.getElementById('open-folder-btn').addEventListener('click', async () => {
         if (currentInstance) {
-            await window.electronAPI.openFolder(`instances/${currentInstance}`);
+            await window.electronAPI.openFolder(currentInstance);
         }
     });
     
     document.getElementById('open-mods-btn').addEventListener('click', async () => {
         if (currentInstance) {
-            await window.electronAPI.openFolder(`instances/${currentInstance}/mods`);
+            await window.electronAPI.openFolder(`${currentInstance}/mods`);
         }
     });
     
@@ -901,11 +901,19 @@ async function importModpack() {
 }
 
 // Settings
-function openSettings() {
+async function openSettings() {
     document.getElementById('show-logo-checkbox').checked = settings.show_logo !== false;
     document.getElementById('sidebar-right-checkbox').checked = settings.sidebar_right || false;
     document.getElementById('default-username-input').value = settings.default_username || '';
     document.getElementById('default-java-input').value = settings.default_java || '';
+    
+    // Update version from package.json
+    try {
+        const version = await window.electronAPI.getAppVersion();
+        document.getElementById('about-version').textContent = `Version ${version}`;
+    } catch (error) {
+        console.error('Error getting app version:', error);
+    }
     
     openModal('settings-modal');
 }

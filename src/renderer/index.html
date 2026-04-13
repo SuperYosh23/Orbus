@@ -16,7 +16,7 @@
                 <div class="logo-container">
                     <img src="../../assets/icon.png" alt="Orbus" class="logo" onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='flex'">
                     <div id="logo-fallback" class="logo-fallback" style="display: none;">
-                        <span class="logo-text">O</span>
+                        <span class="logo-text"></span>
                     </div>
                 </div>
                 <h1 class="app-title">ORBUS</h1>
@@ -93,7 +93,6 @@
                                 <select class="viso-select" id="loader-select">
                                     <option value="Vanilla">Vanilla</option>
                                     <option value="Fabric">Fabric</option>
-                                    <option value="Quilt">Quilt</option>
                                 </select>
                             </div>
                         </div>
@@ -207,7 +206,6 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="viso-btn viso-btn-secondary modal-close">Cancel</button>
                 <button class="viso-btn viso-btn-primary" id="rename-confirm-btn">Rename</button>
             </div>
         </div>
@@ -225,6 +223,7 @@
                 <div class="settings-tabs">
                     <button class="viso-btn viso-btn-ghost tab-btn active" data-tab="appearance">Appearance</button>
                     <button class="viso-btn viso-btn-ghost tab-btn" data-tab="defaults">Defaults</button>
+                    <button class="viso-btn viso-btn-ghost tab-btn" data-tab="about">About</button>
                 </div>
                 <div class="tab-content">
                     <div id="appearance-tab" class="tab-panel active">
@@ -255,12 +254,24 @@
                             </div>
                         </div>
                     </div>
+                    <div id="about-tab" class="tab-panel">
+                        <div style="text-align: center; padding: 20px 0;">
+                            <img src="../../assets/icon.png" alt="Orbus Logo" style="width: 300px; height: 300px; margin-bottom: 16px;" onerror="this.style.display='none'">
+                            <h3 class="viso-h3" style="margin-bottom: 8px;">Orbus Launcher</h3>
+                            <p class="viso-body" style="margin-bottom: 8px;" id="about-version">Version 4.0.0</p>
+                            <p class="viso-body" style="margin-bottom: 8px;">A modern Minecraft launcher with glassmorphism UI.</p>
+                            <div style="display: flex; flex-direction: column; gap: 8px; align-items: center; margin-bottom: 24px;">
+                                <p class="viso-body">Built with:</p>
+                                <p class="viso-body">Electron | VisoDesign | minecraft-launcher-lib</p>
+                            </div>
+                            <p class="viso-body">Code by AI, Design and Concept by SuperYosh23</p>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="viso-btn viso-btn-ghost" id="settings-reset">Reset to Defaults</button>
                 <div>
-                    <button class="viso-btn viso-btn-secondary modal-close">Cancel</button>
                     <button class="viso-btn viso-btn-primary" id="settings-save">Save</button>
                 </div>
             </div>

@@ -365,6 +365,11 @@ ipcMain.handle('get-platform', () => {
   return process.platform;
 });
 
+ipcMain.handle('get-app-version', () => {
+  const packageJson = require('../package.json');
+  return packageJson.version;
+});
+
 // Create console window
 function createConsoleWindow() {
   if (consoleWindow && !consoleWindow.isDestroyed()) {

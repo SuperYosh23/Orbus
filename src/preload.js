@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFolder: (path) => ipcRenderer.invoke('open-folder', path),
   getPlatform: () => ipcRenderer.invoke('get-platform'),
   openConsole: () => ipcRenderer.invoke('open-console'),
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   
   // Event listeners
   onLaunchStatus: (callback) => {
