@@ -6,9 +6,36 @@ __pycache__/
 # You don't want your local instances/folders on GitHub
 orbus_instances/
 orbus_config.json
+orbus_settings.json
 
 # Environment/Build stuff
-build/
-dist/
 venv/
 .env
+
+# Node.js / Electron
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Electron build outputs
+dist/
+out/
+build/
+*.dmg
+*.exe
+*.AppImage
+*.snap
+*.deb
+*.rpm
+*.msi
+*.zip
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

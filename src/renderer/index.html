@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="viso">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orbus Launcher</title>
+    <link rel="stylesheet" href="viso.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body data-theme="viso">
+    <div id="app" class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-container">
+                    <img src="../../assets/icon.png" alt="Orbus" class="logo" onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='flex'">
+                    <div id="logo-fallback" class="logo-fallback" style="display: none;">
+                        <span class="logo-text">O</span>
+                    </div>
+                </div>
+                <h1 class="app-title">ORBUS</h1>
+            </div>
+
+            <div class="instances-section">
+                <div class="instances-header">
+                    <span class="viso-label">My Instances</span>
+                    <button class="viso-btn viso-btn-icon viso-btn-glass viso-btn-sm" id="add-instance-btn" title="Add Instance">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="instances-list" id="instances-list">
+                    <!-- Instances will be populated here -->
+                </div>
+            </div>
+
+            <div class="sidebar-actions">
+                <button class="viso-btn viso-btn-secondary viso-btn-sm" id="import-btn">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 8px;">
+                        <path d="M8 12V4M4 8l4-4 4 4M2 14h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    </svg>
+                    Import .zip/.mrpack
+                </button>
+                <button class="viso-btn viso-btn-primary viso-btn-sm" id="browse-modrinth-btn">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 8px;">
+                        <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                        <path d="M11 11l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                    Browse Modrinth
+                </button>
+                <button class="viso-btn viso-btn-ghost viso-btn-sm" id="settings-btn">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 8px;">
+                        <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                        <path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M3.5 12.5l1.5-1.5M11 5l1.5-1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                    Settings
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- No Instance Selected View -->
+            <div id="no-instance-view" class="no-instance-view">
+                <div class="viso-card" style="text-align: center; max-width: 400px;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">🎮</div>
+                    <h2 class="viso-h2">Select an Instance</h2>
+                    <p class="viso-body">Choose an instance from the sidebar or create a new one to get started.</p>
+                </div>
+            </div>
+
+            <!-- Instance Settings View -->
+            <div id="instance-view" class="instance-view" style="display: none;">
+                <div class="instance-header">
+                    <h2 class="viso-h1" id="instance-name">Instance Name</h2>
+                    <div class="instance-actions">
+                        <button class="viso-btn viso-btn-secondary viso-btn-sm" id="rename-btn">Rename</button>
+                        <button class="viso-btn viso-btn-glass viso-btn-sm" id="change-icon-btn">Change Icon</button>
+                        <button class="viso-btn viso-btn-danger viso-btn-sm" id="delete-btn">Delete</button>
+                    </div>
+                </div>
+
+                <div class="settings-grid">
+                    <div class="viso-card-solid">
+                        <div class="form-group">
+                            <label class="viso-label">Username</label>
+                            <input type="text" class="viso-input" id="username-input" placeholder="Enter username...">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="viso-label">Minecraft Version</label>
+                            <div class="select-wrapper">
+                                <select class="viso-select" id="version-select">
+                                    <option>Loading versions...</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="viso-label">Mod Loader</label>
+                            <div class="select-wrapper">
+                                <select class="viso-select" id="loader-select">
+                                    <option value="Vanilla">Vanilla</option>
+                                    <option value="Fabric">Fabric</option>
+                                    <option value="Quilt">Quilt</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group" id="loader-version-group" style="display: none;">
+                            <label class="viso-label">Fabric Loader Version</label>
+                            <div class="select-wrapper">
+                                <select class="viso-select" id="loader-version-select">
+                                    <option>latest</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="viso-label">Java Executable</label>
+                            <div class="java-input-group">
+                                <input type="text" class="viso-input" id="java-input" placeholder="Default: java/javaw">
+                                <button class="viso-btn viso-btn-secondary viso-btn-sm" id="auto-java-btn">Auto Detect</button>
+                                <button class="viso-btn viso-btn-glass viso-btn-sm" id="browse-java-btn">Browse</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="viso-label">RAM Allocation (GB)</label>
+                            <div class="ram-display">
+                                <span class="viso-h3 viso-accent-text" id="ram-value">4 GB</span>
+                            </div>
+                            <div class="viso-slider-container">
+                                <input type="range" class="viso-slider" id="ram-slider" min="2" max="16" value="4" step="1">
+                                <span class="viso-slider-percent" id="ram-percent">25%</span>
+                            </div>
+                        </div>
+
+                        <label class="viso-checkbox-label" style="margin-top: 16px;">
+                            <input type="checkbox" id="show-logs-checkbox">
+                            <span>Show Console Logs</span>
+                        </label>
+                    </div>
+
+                    <div class="quick-actions">
+                        <button class="viso-btn viso-btn-glass" id="open-folder-btn" style="width: 100%; justify-content: flex-start;">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 8px;">
+                                <path d="M2 4h12v10H2V4zm0 0l2-2h8l2 2" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                            </svg>
+                            Open Instance Folder
+                        </button>
+                        <button class="viso-btn viso-btn-glass" id="open-mods-btn" style="width: 100%; justify-content: flex-start;">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 8px;">
+                                <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                                <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                                <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                                <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                            </svg>
+                            Open Mods Folder
+                        </button>
+                    </div>
+                </div>
+
+                <div class="launch-section">
+                    <div class="status-bar">
+                        <span class="viso-caption" id="status-text">Ready</span>
+                        <div class="viso-progress" id="launch-progress" style="display: none; width: 200px;">
+                            <div class="viso-progress-bar" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    <button class="viso-btn viso-btn-primary viso-btn-lg" id="launch-btn" style="width: 100%;">
+                        <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 8px;">
+                            <path d="M3 2l10 6-10 6V2z" fill="currentColor"/>
+                        </svg>
+                        LAUNCH GAME
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modrinth Browser Modal -->
+    <div id="modrinth-modal" class="modal" style="display: none;">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content viso-card" style="width: 800px; max-height: 80vh;">
+            <div class="modal-header">
+                <h2 class="viso-h2">Modrinth Browser</h2>
+                <button class="viso-btn viso-btn-icon viso-btn-ghost modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="search-bar">
+                    <input type="text" class="viso-input" id="modrinth-search" placeholder="Search modpacks...">
+                    <button class="viso-btn viso-btn-primary" id="modrinth-search-btn">Search</button>
+                </div>
+                <div id="modrinth-results" class="modrinth-results">
+                    <!-- Results will be populated here -->
+                </div>
+                <div id="modrinth-loading" class="loading-state" style="display: none;">
+                    <div class="viso-spinner"></div>
+                    <p class="viso-body" style="margin-top: 16px;">Searching Modrinth...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal" style="display: none;">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content viso-card" style="width: 600px;">
+            <div class="modal-header">
+                <h2 class="viso-h2">Settings</h2>
+                <button class="viso-btn viso-btn-icon viso-btn-ghost modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-tabs">
+                    <button class="viso-btn viso-btn-ghost tab-btn active" data-tab="appearance">Appearance</button>
+                    <button class="viso-btn viso-btn-ghost tab-btn" data-tab="defaults">Defaults</button>
+                </div>
+                <div class="tab-content">
+                    <div id="appearance-tab" class="tab-panel active">
+                        <div class="form-group">
+                            <label class="viso-label">Corner Radius</label>
+                            <div class="viso-slider-container">
+                                <input type="range" class="viso-slider" id="corner-radius-slider" min="0" max="20" value="8" step="1">
+                                <span class="viso-slider-percent" id="corner-radius-value">8px</span>
+                            </div>
+                        </div>
+                        <label class="viso-checkbox-label">
+                            <input type="checkbox" id="show-logo-checkbox" checked>
+                            <span>Show Orbus Logo</span>
+                        </label>
+                    </div>
+                    <div id="defaults-tab" class="tab-panel">
+                        <div class="form-group">
+                            <label class="viso-label">Default Username</label>
+                            <input type="text" class="viso-input" id="default-username-input" placeholder="Enter default username...">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="viso-btn viso-btn-ghost" id="settings-reset">Reset to Defaults</button>
+                <div>
+                    <button class="viso-btn viso-btn-secondary modal-close">Cancel</button>
+                    <button class="viso-btn viso-btn-primary" id="settings-save">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Java Detector Modal -->
+    <div id="java-modal" class="modal" style="display: none;">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content viso-card" style="width: 600px; max-height: 70vh;">
+            <div class="modal-header">
+                <h2 class="viso-h2">Java Auto-Detect</h2>
+                <button class="viso-btn viso-btn-icon viso-btn-ghost modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="java-scanning" class="loading-state">
+                    <div class="viso-spinner"></div>
+                    <p class="viso-body" style="margin-top: 16px;" id="java-status">Scanning for Java installations...</p>
+                </div>
+                <div id="java-results" style="display: none;">
+                    <div class="java-list" id="java-list"></div>
+                </div>
+                <button class="viso-btn viso-btn-secondary" id="deep-scan-btn" style="margin-top: 16px; width: 100%;">
+                    Deep Scan (may take longer)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Console Logs Window -->
+    <div id="console-window" class="console-window" style="display: none;">
+        <div class="console-header">
+            <span class="viso-label">Minecraft Console</span>
+            <button class="viso-btn viso-btn-icon viso-btn-ghost" id="console-close">&times;</button>
+        </div>
+        <div class="console-content" id="console-content"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

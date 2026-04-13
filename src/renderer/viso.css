@@ -1,0 +1,1090 @@
+/**
+ * Viso Design System
+ * An open-source dark theme design language with vibrant green accents
+ * Version: 1.0.0
+ * License: MIT
+ * 
+ * Usage: Include this CSS file in your project and add data-theme="viso" to your <html> or <body> tag
+ * <link rel="stylesheet" href="viso.css">
+ * <body data-theme="viso">
+ */
+
+/* =============================================
+   DESIGN TOKENS
+   Core variables that define the Viso aesthetic
+   ============================================= */
+
+[data-theme="viso"], :root {
+    /* 
+     * CUSTOMIZATION
+     * Change this accent color to theme the entire design system.
+     * Simply override these three variables with your hex color:
+     * 
+     * Example - Blue theme:
+     *   --viso-accent: #3b82f6;
+     *   --viso-accent-dim: #2563eb;
+     *   --viso-accent-glow: rgba(59, 130, 246, 0.4);
+     * 
+     * Example - Purple theme:
+     *   --viso-accent: #a855f7;
+     *   --viso-accent-dim: #9333ea;
+     *   --viso-accent-glow: rgba(168, 85, 247, 0.4);
+     */
+
+    /* 
+     * COLOR PALETTE
+     * Primary backgrounds range from deep space to charcoal
+     * Default accent: Vibrant Green
+     */
+
+    /* Core Background Colors */
+    --viso-bg-primary: #0d1117;      /* Deepest background - almost black */
+    --viso-bg-secondary: #161b22;      /* Card/surface backgrounds */
+    --viso-bg-tertiary: #21262d;      /* Elevated elements, hover states */
+    --viso-surface: rgba(22, 27, 34, 0.85);  /* Glassmorphism surface */
+
+    /* Accent Colors - CUSTOMIZE THESE */
+    --viso-accent: #3ddc84;           /* Primary accent - vibrant green */
+    --viso-accent-dim: #2ea043;       /* Hover/active states - darker shade */
+    --viso-accent-glow: rgba(61, 220, 132, 0.4);  /* Glow effects - same hue, 40% opacity */
+
+    /* Semantic Colors */
+    --viso-gold: #ffd700;             /* Success, achievement, premium */
+    --viso-red: #f85149;              /* Error, danger, destructive */
+    --viso-orange: #ff9800;           /* Warning, offline indicator */
+
+    /* Text Colors */
+    --viso-text-primary: #f0f6fc;   /* Headings, primary text */
+    --viso-text-secondary: #8b949e;   /* Body text, descriptions */
+    --viso-text-muted: #6e7681;       /* Disabled, placeholders */
+
+    /* 
+     * EFFECTS & SHADOWS
+     * Glassmorphism and elevation system
+     */
+    --glass-bg: rgba(13, 17, 23, 0.75);
+    --glass-border: rgba(48, 54, 61, 0.6);
+
+    /* Shadow Elevation System */
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+    --shadow-glow: 0 0 20px var(--viso-accent-glow);
+
+    /* 
+     * TYPOGRAPHY
+     * Modern, clean system font stack
+     */
+    --viso-font: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+
+    /* Font Weights */
+    --font-normal: 400;
+    --font-medium: 500;
+    --font-semibold: 600;
+    --font-bold: 700;
+
+    /* 
+     * SPACING SCALE
+     * 4px base grid system
+     */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-10: 40px;
+
+    /* 
+     * BORDER RADIUS
+     * Consistent corner rounding
+     */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-full: 9999px;
+
+    /* 
+     * TRANSITIONS
+     * Smooth, responsive interactions
+     */
+    --transition-instant: 0ms;
+    --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: 400ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    /* 
+     * Z-INDEX SCALE
+     * Layer management
+     */
+    --z-base: 0;
+    --z-dropdown: 100;
+    --z-sticky: 200;
+    --z-fixed: 300;
+    --z-modal-backdrop: 400;
+    --z-modal: 500;
+    --z-popover: 600;
+    --z-tooltip: 700;
+}
+
+/* =============================================
+   BASE STYLES
+   Foundational reset and typography
+   ============================================= */
+
+[data-theme="viso"] *,
+[data-theme="viso"] *::before,
+[data-theme="viso"] *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+[data-theme="viso"] {
+    font-family: var(--viso-font);
+    background-color: var(--viso-bg-primary);
+    color: var(--viso-text-primary);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typography Scale */
+[data-theme="viso"] h1,
+[data-theme="viso"] .viso-h1 {
+    font-size: 2rem;
+    font-weight: var(--font-bold);
+    letter-spacing: -0.025em;
+    color: var(--viso-text-primary);
+}
+
+[data-theme="viso"] h2,
+[data-theme="viso"] .viso-h2 {
+    font-size: 1.5rem;
+    font-weight: var(--font-semibold);
+    letter-spacing: -0.025em;
+    color: var(--viso-text-primary);
+}
+
+[data-theme="viso"] h3,
+[data-theme="viso"] .viso-h3 {
+    font-size: 1.25rem;
+    font-weight: var(--font-semibold);
+    color: var(--viso-text-primary);
+}
+
+[data-theme="viso"] p,
+[data-theme="viso"] .viso-body {
+    font-size: 1rem;
+    font-weight: var(--font-normal);
+    color: var(--viso-text-secondary);
+}
+
+[data-theme="viso"] .viso-caption {
+    font-size: 0.875rem;
+    font-weight: var(--font-normal);
+    color: var(--viso-text-muted);
+}
+
+[data-theme="viso"] .viso-label {
+    font-size: 0.75rem;
+    font-weight: var(--font-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--viso-text-muted);
+}
+
+/* =============================================
+   BUTTONS
+   Primary, secondary, and icon button variants
+   ============================================= */
+
+/* Base Button */
+[data-theme="viso"] .viso-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-5);
+    font-family: var(--viso-font);
+    font-size: 0.875rem;
+    font-weight: var(--font-semibold);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    border: 2px solid transparent;
+    text-decoration: none;
+    white-space: nowrap;
+    user-select: none;
+}
+
+/* Primary Button - Solid with accent */
+[data-theme="viso"] .viso-btn-primary {
+    background: linear-gradient(145deg, var(--viso-accent-dim), var(--viso-accent));
+    border-color: var(--viso-accent);
+    color: var(--viso-bg-primary);
+    box-shadow: var(--shadow-sm);
+}
+
+[data-theme="viso"] .viso-btn-primary:hover {
+    background: linear-gradient(145deg, var(--viso-accent), var(--viso-accent-dim));
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md), var(--shadow-glow);
+}
+
+[data-theme="viso"] .viso-btn-primary:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Secondary Button - Outlined */
+[data-theme="viso"] .viso-btn-secondary {
+    background: linear-gradient(145deg, var(--viso-bg-tertiary), var(--viso-bg-secondary));
+    border-color: var(--glass-border);
+    color: var(--viso-text-primary);
+    box-shadow: var(--shadow-sm);
+}
+
+[data-theme="viso"] .viso-btn-secondary:hover {
+    border-color: var(--viso-accent);
+    color: var(--viso-accent);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+[data-theme="viso"] .viso-btn-secondary:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Glass Button - Glassmorphism effect */
+[data-theme="viso"] .viso-btn-glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-color: var(--glass-border);
+    color: var(--viso-text-primary);
+    box-shadow: var(--shadow-md);
+}
+
+[data-theme="viso"] .viso-btn-glass:hover {
+    border-color: var(--viso-accent);
+    color: var(--viso-accent);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+[data-theme="viso"] .viso-btn-glass:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Ghost Button - Text only */
+[data-theme="viso"] .viso-btn-ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--viso-text-secondary);
+}
+
+[data-theme="viso"] .viso-btn-ghost:hover {
+    background: var(--viso-bg-tertiary);
+    color: var(--viso-text-primary);
+}
+
+/* Danger Button */
+[data-theme="viso"] .viso-btn-danger {
+    background: var(--viso-red);
+    border-color: var(--viso-red);
+    color: white;
+}
+
+[data-theme="viso"] .viso-btn-danger:hover {
+    background: #ff6b6b;
+    border-color: #ff6b6b;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+[data-theme="viso"] .viso-btn-danger:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Disabled State */
+[data-theme="viso"] .viso-btn:disabled,
+[data-theme="viso"] .viso-btn.viso-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+    transform: none !important;
+}
+
+/* Icon Button */
+[data-theme="viso"] .viso-btn-icon {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: var(--radius-md);
+}
+
+/* Icon Button Variants */
+[data-theme="viso"] .viso-btn-icon.viso-btn-glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-color: var(--glass-border);
+}
+
+[data-theme="viso"] .viso-btn-icon.viso-btn-glass:hover {
+    border-color: var(--viso-accent);
+    color: var(--viso-accent);
+}
+
+[data-theme="viso"] .viso-btn-icon.viso-btn-ghost {
+    background: transparent;
+    border-color: transparent;
+}
+
+[data-theme="viso"] .viso-btn-icon.viso-btn-ghost:hover {
+    background: var(--viso-bg-tertiary);
+    color: var(--viso-text-primary);
+}
+
+[data-theme="viso"] .viso-btn-icon.viso-btn-danger {
+    background: var(--viso-red);
+    border-color: var(--viso-red);
+    color: white;
+}
+
+[data-theme="viso"] .viso-btn-icon.viso-btn-danger:hover {
+    background: #ff6b6b;
+    border-color: #ff6b6b;
+}
+
+/* Button Sizes */
+[data-theme="viso"] .viso-btn-sm {
+    padding: var(--space-2) var(--space-3);
+    font-size: 0.75rem;
+}
+
+[data-theme="viso"] .viso-btn-lg {
+    padding: var(--space-4) var(--space-6);
+    font-size: 1rem;
+}
+
+/* =============================================
+   CARDS & SURFACES
+   Glassmorphism and elevated containers
+   ============================================= */
+
+[data-theme="viso"] .viso-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    -moz-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+    box-shadow: var(--shadow-md);
+}
+
+[data-theme="viso"] .viso-card-solid {
+    background: var(--viso-bg-secondary);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+    box-shadow: var(--shadow-sm);
+}
+
+[data-theme="viso"] .viso-surface {
+    background: var(--viso-surface);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+}
+
+/* =============================================
+   FORM ELEMENTS
+   Inputs, selects, checkboxes, and sliders
+   ============================================= */
+
+/* Text Input */
+[data-theme="viso"] .viso-input {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    background: rgba(0, 0, 0, 0.4);
+    border: 2px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    color: var(--viso-text-primary);
+    font-family: var(--viso-font);
+    font-size: 0.875rem;
+    transition: all var(--transition-fast);
+}
+
+[data-theme="viso"] .viso-input:hover {
+    border-color: var(--viso-accent);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+[data-theme="viso"] .viso-input:focus {
+    outline: none;
+    border-color: var(--viso-accent);
+    box-shadow: 0 0 0 3px var(--viso-accent-glow);
+    transform: translateY(0);
+}
+
+[data-theme="viso"] .viso-input:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow-sm);
+}
+
+[data-theme="viso"] .viso-input::placeholder {
+    color: var(--viso-text-muted);
+}
+
+/* Select */
+[data-theme="viso"] .viso-select {
+    appearance: none;
+    padding: var(--space-3) var(--space-8) var(--space-3) var(--space-4);
+    background: rgba(0, 0, 0, 0.4);
+    border: 2px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    color: var(--viso-text-primary);
+    font-family: var(--viso-font);
+    font-size: 0.875rem;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    transition: all var(--transition-fast);
+}
+
+[data-theme="viso"] .viso-select:hover {
+    border-color: var(--viso-accent);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+[data-theme="viso"] .viso-select:focus {
+    outline: none;
+    border-color: var(--viso-accent);
+    box-shadow: 0 0 0 3px var(--viso-accent-glow);
+    transform: translateY(0);
+}
+
+[data-theme="viso"] .viso-select:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Checkbox - Label wrapper style matching Viso theme */
+[data-theme="viso"] .viso-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    color: var(--viso-text-primary);
+    font-size: 14px;
+    padding: 8px 0;
+}
+
+[data-theme="viso"] .viso-checkbox-label input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--glass-border);
+    border-radius: 4px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    -moz-backdrop-filter: blur(12px) saturate(180%);
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    position: relative;
+    transition: all var(--transition-fast);
+}
+
+[data-theme="viso"] .viso-checkbox-label input[type="checkbox"]:checked {
+    background: var(--viso-accent);
+    border-color: var(--viso-accent);
+}
+
+[data-theme="viso"] .viso-checkbox-label input[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    animation: viso-check-bounce var(--transition-bounce);
+}
+
+[data-theme="viso"] .viso-checkbox-label input[type="checkbox"]:focus {
+    box-shadow: 0 0 0 3px var(--viso-accent-glow);
+}
+
+[data-theme="viso"] .viso-checkbox-label:hover input[type="checkbox"]:not(:checked) {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Standalone checkbox (alternative style) */
+[data-theme="viso"] .viso-checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 20px;
+    height: 20px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    -moz-backdrop-filter: blur(12px) saturate(180%);
+    border: 2px solid var(--glass-border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: grid;
+    place-content: center;
+    position: relative;
+}
+
+[data-theme="viso"] .viso-checkbox:checked {
+    background: var(--viso-accent);
+    border-color: var(--viso-accent);
+}
+
+[data-theme="viso"] .viso-checkbox:checked::after {
+    content: '✓';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    animation: viso-check-bounce var(--transition-bounce);
+}
+
+[data-theme="viso"] .viso-checkbox:focus {
+    outline: none;
+    border-color: var(--viso-accent);
+    box-shadow: 0 0 0 3px var(--viso-accent-glow);
+}
+
+[data-theme="viso"] .viso-checkbox:hover:not(:checked) {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Toggle Switch */
+[data-theme="viso"] .viso-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3);
+    cursor: pointer;
+    user-select: none;
+}
+
+[data-theme="viso"] .viso-toggle input {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 48px;
+    height: 24px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    -moz-backdrop-filter: blur(12px) saturate(180%);
+    border: 2px solid var(--glass-border);
+    border-radius: var(--radius-full);
+    position: relative;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+[data-theme="viso"] .viso-toggle input::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: var(--viso-text-muted);
+    border-radius: 50%;
+    transition: transform var(--transition-bounce), background var(--transition-fast);
+}
+
+[data-theme="viso"] .viso-toggle input:checked {
+    background: var(--viso-accent);
+    border-color: var(--viso-accent);
+}
+
+[data-theme="viso"] .viso-toggle input:checked::after {
+    transform: translateX(24px) scale(1.1);
+    background: white;
+}
+
+[data-theme="viso"] .viso-toggle input:not(:checked)::after {
+    transform: translateX(0) scale(1);
+}
+
+[data-theme="viso"] .viso-toggle input:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--viso-accent-glow);
+}
+
+[data-theme="viso"] .viso-toggle:hover input:not(:checked) {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+}
+
+[data-theme="viso"] .viso-toggle span {
+    color: var(--viso-text-primary);
+    font-size: 0.875rem;
+}
+
+/* Neutral Toggle - Always appears deactivated with text inside */
+[data-theme="viso"] .viso-toggle-neutral {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+}
+
+[data-theme="viso"] .viso-toggle-neutral input {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 64px;
+    height: 28px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    -moz-backdrop-filter: blur(12px) saturate(180%);
+    border: 2px solid var(--glass-border);
+    border-radius: var(--radius-full);
+    position: relative;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+[data-theme="viso"] .viso-toggle-neutral input::before {
+    content: attr(data-off);
+    position: absolute;
+    right: 8px;
+    font-size: 0.625rem;
+    font-weight: var(--font-semibold);
+    color: var(--viso-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    pointer-events: none;
+    transition: opacity var(--transition-fast);
+}
+
+[data-theme="viso"] .viso-toggle-neutral input::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: var(--viso-text-secondary);
+    border-radius: 50%;
+    transition: transform var(--transition-bounce), background var(--transition-fast);
+    z-index: 2;
+}
+
+[data-theme="viso"] .viso-toggle-neutral input:checked {
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    -moz-backdrop-filter: blur(12px) saturate(180%);
+    border-color: var(--glass-border);
+}
+
+[data-theme="viso"] .viso-toggle-neutral input:checked::before {
+    content: attr(data-on);
+    right: auto;
+    left: 8px;
+    color: var(--viso-text-secondary);
+}
+
+[data-theme="viso"] .viso-toggle-neutral input:checked::after {
+    transform: translateX(36px);
+    background: var(--viso-text-secondary);
+}
+
+[data-theme="viso"] .viso-toggle-neutral input:not(:checked)::after {
+    transform: translateX(0);
+}
+
+[data-theme="viso"] .viso-toggle-neutral input:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(139, 148, 158, 0.3);
+}
+
+[data-theme="viso"] .viso-toggle-neutral:hover input {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Slider */
+[data-theme="viso"] .viso-slider-container {
+    position: relative;
+    width: 100%;
+    height: 40px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    -moz-backdrop-filter: blur(12px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+[data-theme="viso"] .viso-slider-container:focus-within {
+    box-shadow: 0 0 0 3px var(--viso-accent-glow);
+    border-radius: 8px;
+    border-color: var(--viso-accent);
+}
+
+[data-theme="viso"] .viso-slider-container:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--viso-accent);
+}
+
+[data-theme="viso"] .viso-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    outline: none;
+    cursor: pointer;
+    margin: 0;
+    position: relative;
+    z-index: 2;
+    will-change: transform;
+}
+
+[data-theme="viso"] .viso-slider::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: var(--radius-sm);
+}
+
+[data-theme="viso"] .viso-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 100%;
+    background: var(--viso-accent);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 0 10px var(--viso-accent-glow);
+    transition: transform 0.05s ease-out, background 0.15s ease;
+    will-change: transform;
+}
+
+[data-theme="viso"] .viso-slider::-webkit-slider-thumb:hover {
+    transform: scaleX(1.15);
+    background: var(--viso-accent);
+}
+
+[data-theme="viso"] .viso-slider:active::-webkit-slider-thumb {
+    transform: scaleX(1.25) scaleY(1.05);
+    cursor: grabbing;
+}
+
+/* Firefox slider styles */
+[data-theme="viso"] .viso-slider::-moz-range-track {
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: var(--radius-sm);
+    border: none;
+}
+
+[data-theme="viso"] .viso-slider::-moz-range-thumb {
+    -moz-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 100%;
+    background: var(--viso-accent);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 0 10px var(--viso-accent-glow);
+    border: none;
+    cursor: pointer;
+}
+
+[data-theme="viso"] .viso-slider::-moz-range-thumb:hover {
+    transform: scaleX(1.15);
+    background: var(--viso-accent);
+}
+
+[data-theme="viso"] .viso-slider:focus::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px var(--viso-accent-glow), 0 0 15px var(--viso-accent-glow);
+}
+
+/* Controller navigation focus styles for sliders */
+[data-theme="viso"] .viso-slider.nav-item:focus {
+    outline: none;
+}
+
+/* Slider Percentage Display */
+[data-theme="viso"] .viso-slider-percent {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--viso-text-primary);
+    font-size: 13px;
+    font-weight: 600;
+    pointer-events: none;
+    z-index: 3;
+}
+
+/* =============================================
+   PROGRESS INDICATORS
+   Linear progress bars and spinners
+   ============================================= */
+
+[data-theme="viso"] .viso-progress {
+    width: 100%;
+    height: 8px;
+    background: var(--viso-bg-tertiary);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+[data-theme="viso"] .viso-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--viso-accent-dim), var(--viso-accent));
+    border-radius: var(--radius-full);
+    transition: width var(--transition-base);
+    box-shadow: 0 0 10px var(--viso-accent-glow);
+}
+
+[data-theme="viso"] .viso-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--viso-bg-tertiary);
+    border-top-color: var(--viso-accent);
+    border-radius: 50%;
+    animation: viso-spin 1s linear infinite;
+}
+
+@keyframes viso-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes viso-check-bounce {
+    0% { transform: scale(0); }
+    50% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+}
+
+/* =============================================
+   TOOLTIPS & BADGES
+   Contextual information displays
+   ============================================= */
+
+[data-theme="viso"] .viso-tooltip {
+    position: relative;
+}
+
+[data-theme="viso"] .viso-tooltip::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    padding: var(--space-2) var(--space-3);
+    background: var(--viso-bg-secondary);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    color: var(--viso-text-primary);
+    font-size: 0.75rem;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all var(--transition-bounce);
+    z-index: var(--z-tooltip);
+    box-shadow: var(--shadow-md);
+    pointer-events: none;
+}
+
+[data-theme="viso"] .viso-tooltip:hover::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(-8px);
+}
+
+/* Tooltip positions */
+[data-theme="viso"] .viso-tooltip[data-tooltip-pos="bottom"]::after {
+    bottom: auto;
+    top: 100%;
+    transform: translateX(-50%) translateY(-10px);
+}
+
+[data-theme="viso"] .viso-tooltip[data-tooltip-pos="bottom"]:hover::after {
+    transform: translateX(-50%) translateY(8px);
+}
+
+[data-theme="viso"] .viso-tooltip[data-tooltip-pos="left"]::after {
+    bottom: auto;
+    left: auto;
+    right: 100%;
+    top: 50%;
+    transform: translateX(10px) translateY(-50%);
+}
+
+[data-theme="viso"] .viso-tooltip[data-tooltip-pos="left"]:hover::after {
+    transform: translateX(-8px) translateY(-50%);
+}
+
+[data-theme="viso"] .viso-tooltip[data-tooltip-pos="right"]::after {
+    bottom: auto;
+    left: 100%;
+    top: 50%;
+    transform: translateX(-10px) translateY(-50%);
+}
+
+[data-theme="viso"] .viso-tooltip[data-tooltip-pos="right"]:hover::after {
+    transform: translateX(8px) translateY(-50%);
+}
+
+[data-theme="viso"] .viso-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-1) var(--space-2);
+    font-size: 0.75rem;
+    font-weight: var(--font-medium);
+    border-radius: var(--radius-sm);
+    background: var(--viso-bg-tertiary);
+    color: var(--viso-text-secondary);
+}
+
+[data-theme="viso"] .viso-badge-accent {
+    background: var(--viso-accent);
+    color: var(--viso-bg-primary);
+}
+
+[data-theme="viso"] .viso-badge-gold {
+    background: var(--viso-gold);
+    color: var(--viso-bg-primary);
+}
+
+/* =============================================
+   DIVIDERS & SEPARATORS
+   Visual content separation
+   ============================================= */
+
+[data-theme="viso"] .viso-divider {
+    height: 1px;
+    background: var(--glass-border);
+    margin: var(--space-4) 0;
+}
+
+[data-theme="viso"] .viso-divider-vertical {
+    width: 1px;
+    height: 100%;
+    background: var(--glass-border);
+}
+
+/* =============================================
+   SCROLLBAR STYLING
+   Custom scrollbar for webkit browsers
+   ============================================= */
+
+[data-theme="viso"] ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+[data-theme="viso"] ::-webkit-scrollbar-track {
+    background: var(--viso-bg-primary);
+}
+
+[data-theme="viso"] ::-webkit-scrollbar-thumb {
+    background: var(--viso-bg-tertiary);
+    border-radius: var(--radius-full);
+    border: 2px solid var(--viso-bg-primary);
+}
+
+[data-theme="viso"] ::-webkit-scrollbar-thumb:hover {
+    background: var(--viso-accent);
+}
+
+/* =============================================
+   UTILITY CLASSES
+   Helper classes for common patterns
+   ============================================= */
+
+[data-theme="viso"] .viso-glow {
+    box-shadow: var(--shadow-glow);
+}
+
+[data-theme="viso"] .viso-glow-text {
+    text-shadow: 0 0 20px var(--viso-accent-glow);
+}
+
+[data-theme="viso"] .viso-accent-text {
+    color: var(--viso-accent);
+}
+
+[data-theme="viso"] .viso-gold-text {
+    color: var(--viso-gold);
+}
+
+[data-theme="viso"] .viso-muted-text {
+    color: var(--viso-text-muted);
+}
+
+/* Flex utilities */
+[data-theme="viso"] .viso-flex {
+    display: flex;
+}
+
+[data-theme="viso"] .viso-flex-col {
+    flex-direction: column;
+}
+
+[data-theme="viso"] .viso-items-center {
+    align-items: center;
+}
+
+[data-theme="viso"] .viso-justify-center {
+    justify-content: center;
+}
+
+[data-theme="viso"] .viso-gap-2 {
+    gap: var(--space-2);
+}
+
+[data-theme="viso"] .viso-gap-4 {
+    gap: var(--space-4);
+}
+
+/* Container */
+[data-theme="viso"] .viso-container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 var(--space-4);
+}
