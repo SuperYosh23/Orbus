@@ -192,6 +192,27 @@
         </div>
     </div>
 
+    <!-- Rename Instance Modal -->
+    <div id="rename-modal" class="modal" style="display: none;">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content viso-card" style="width: 400px;">
+            <div class="modal-header">
+                <h2 class="viso-h2">Rename Instance</h2>
+                <button class="viso-btn viso-btn-icon viso-btn-ghost modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="viso-label">New Name</label>
+                    <input type="text" class="viso-input" id="rename-input" placeholder="Enter new instance name...">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="viso-btn viso-btn-secondary modal-close">Cancel</button>
+                <button class="viso-btn viso-btn-primary" id="rename-confirm-btn">Rename</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Settings Modal -->
     <div id="settings-modal" class="modal" style="display: none;">
         <div class="modal-backdrop"></div>

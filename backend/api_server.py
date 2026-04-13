@@ -375,6 +375,7 @@ class APIHandler(BaseHTTPRequestHandler):
             # Launch in background thread
             def launch():
                 try:
+                    print(f"[Launch] Starting launch for {name}")
                     target_dir = os.path.join(INSTANCES_DIR, name)
                     os.makedirs(target_dir, exist_ok=True)
                     
@@ -385,8 +386,48 @@ class APIHandler(BaseHTTPRequestHandler):
                     ram = instance.get("ram", 4)
                     custom_java = instance.get("java_path", "").strip()
                     
+                    print(f"[Launch] Instance data: version={v}, loader={loader}, java_path={custom_java}")
+                    
+                    # Determine Java path FIRST - needed for both installation and launch
+                    # Priority: instance > settings default > system
+                    print(f"[Launch] Instance Java path: '{custom_java}', exists: {os.path.exists(custom_java) if custom_java else False}")
+                    
+                    if custom_java and os.path.exists(custom_java):
+                        java = custom_java
+                        print(f"[Launch] Using instance Java: {java}")
+                    else:
+                        # Check for default Java in settings
+                        settings = load_settings()
+                        default_java = settings.get("default_java", "").strip()
+                        print(f"[Launch] Settings default_java: '{default_java}', exists: {os.path.exists(default_java) if default_java else False}")
+                        
+                        if default_java and os.path.exists(default_java):
+                            java = default_java
+                            print(f"[Launch] Using settings Java: {java}")
+                        else:
+                            # Fall back to system Java
+                            if sys.platform.startswith("linux"):
+                                java_path = shutil.which("java") or shutil.which("javaw")
+                            else:
+                                java_path = shutil.which("javaw") or shutil.which("java")
+                            
+                            print(f"[Launch] System Java path: {java_path}")
+                            if not java_path:
+                                raise Exception("Java not found in PATH")
+                            java = os.path.abspath(java_path)
+                            print(f"[Launch] Using system Java: {java}")
+                    
+                    # Set JAVA_HOME and update PATH for subprocess calls
+                    java_home = os.path.dirname(os.path.dirname(java))  # Go up 2 levels from bin/java
+                    env = os.environ.copy()
+                    env['JAVA_HOME'] = java_home
+                    env['PATH'] = os.path.join(java_home, 'bin') + os.pathsep + env.get('PATH', '')
+                    print(f"[Launch] Set JAVA_HOME={java_home}")
+                    
                     # Install Minecraft
+                    print(f"[Launch] Installing Minecraft {v}...")
                     minecraft_launcher_lib.install.install_minecraft_version(v, MINECRAFT_DIR)
+                    print(f"[Launch] Minecraft installed")
                     
                     # Install loader
                     l_id = str(v)
@@ -395,32 +436,28 @@ class APIHandler(BaseHTTPRequestHandler):
                         if l_ver == "latest":
                             fabric_meta = requests.get("https://meta.fabricmc.net/v2/versions/loader").json()
                             actual_loader = fabric_meta[0]["version"]
-                        minecraft_launcher_lib.fabric.install_fabric(v, MINECRAFT_DIR, loader_version=actual_loader)
+                        print(f"[Launch] Installing Fabric loader {actual_loader}...")
+                        # Set environment for fabric installation
+                        old_env = os.environ.copy()
+                        os.environ.update(env)
+                        try:
+                            minecraft_launcher_lib.fabric.install_fabric(v, MINECRAFT_DIR, loader_version=actual_loader)
+                        finally:
+                            os.environ.clear()
+                            os.environ.update(old_env)
+                        print(f"[Launch] Fabric installed")
                         l_id = f"fabric-loader-{actual_loader}-{v}"
                     elif loader == "Quilt":
-                        minecraft_launcher_lib.quilt.install_quilt(v, MINECRAFT_DIR)
+                        print(f"[Launch] Installing Quilt loader...")
+                        old_env = os.environ.copy()
+                        os.environ.update(env)
+                        try:
+                            minecraft_launcher_lib.quilt.install_quilt(v, MINECRAFT_DIR)
+                        finally:
+                            os.environ.clear()
+                            os.environ.update(old_env)
+                        print(f"[Launch] Quilt installed")
                         l_id = f"quilt-loader-{v}"
-                    
-                    # Determine Java path - priority: instance > settings default > system
-                    if custom_java and os.path.exists(custom_java):
-                        java = custom_java
-                    else:
-                        # Check for default Java in settings
-                        settings = load_settings()
-                        default_java = settings.get("default_java", "").strip()
-                        
-                        if default_java and os.path.exists(default_java):
-                            java = default_java
-                        else:
-                            # Fall back to system Java
-                            if sys.platform.startswith("linux"):
-                                java_path = shutil.which("java") or shutil.which("javaw")
-                            else:
-                                java_path = shutil.which("javaw") or shutil.which("java")
-                            
-                            if not java_path:
-                                raise Exception("Java not found in PATH")
-                            java = os.path.abspath(java_path)
                     
                     # Launch options
                     import uuid as uuidlib
@@ -540,17 +577,23 @@ class APIHandler(BaseHTTPRequestHandler):
             old_name = parts[3]
             new_name = body.get('new_name')
             
+            print(f"[Rename] Request: old='{old_name}', new='{new_name}'")
+            
             if not new_name:
+                print("[Rename] Error: New name required")
                 self.send_json_response({"error": "New name required"}, 400)
                 return
             
             config = load_config()
+            print(f"[Rename] Current instances: {list(config.keys())}")
             
             if old_name not in config:
+                print(f"[Rename] Error: Instance '{old_name}' not found")
                 self.send_json_response({"error": "Instance not found"}, 404)
                 return
             
             if new_name in config:
+                print(f"[Rename] Error: Name '{new_name}' already exists")
                 self.send_json_response({"error": "Name already exists"}, 400)
                 return
             
@@ -558,6 +601,7 @@ class APIHandler(BaseHTTPRequestHandler):
             old_dir = os.path.join(INSTANCES_DIR, old_name)
             new_dir = os.path.join(INSTANCES_DIR, new_name)
             
+            print(f"[Rename] Moving dir from '{old_dir}' to '{new_dir}'")
             if os.path.exists(old_dir):
                 shutil.move(old_dir, new_dir)
             
@@ -570,6 +614,7 @@ class APIHandler(BaseHTTPRequestHandler):
                 config[new_name]["icon_path"] = icon_path.replace(old_name, new_name)
             
             save_config(config)
+            print(f"[Rename] Success: '{old_name}' -> '{new_name}'")
             self.send_json_response({"success": True})
         
         elif path == '/api/instances/reorder':

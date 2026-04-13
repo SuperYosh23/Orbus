@@ -351,6 +351,12 @@ function setupEventListeners() {
     
     // Deep scan button
     document.getElementById('deep-scan-btn').addEventListener('click', () => scanJava(true));
+    
+    // Rename modal confirm button
+    document.getElementById('rename-confirm-btn').addEventListener('click', confirmRename);
+    document.getElementById('rename-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') confirmRename();
+    });
 }
 
 // Modal handling
@@ -406,21 +412,29 @@ async function addInstance() {
     }
 }
 
-async function renameInstance() {
+let renameTargetInstance = null;
+
+function openRenameModal() {
     if (!currentInstance) {
         console.log('Rename: No instance selected');
         return;
     }
-    
-    const newName = prompt(`Rename "${currentInstance}" to:`, currentInstance);
-    console.log(`Rename: Prompt returned "${newName}"`);
+    renameTargetInstance = currentInstance;
+    document.getElementById('rename-input').value = currentInstance;
+    openModal('rename-modal');
+    document.getElementById('rename-input').focus();
+    document.getElementById('rename-input').select();
+}
+
+async function confirmRename() {
+    const newName = document.getElementById('rename-input').value.trim();
     
     if (!newName) {
-        console.log('Rename: Cancelled or empty name');
+        alert('Please enter a name');
         return;
     }
-    if (newName === currentInstance) {
-        console.log('Rename: Same name');
+    if (newName === renameTargetInstance) {
+        closeModal('rename-modal');
         return;
     }
     if (instances[newName]) {
@@ -429,16 +443,17 @@ async function renameInstance() {
     }
     
     try {
-        console.log(`Rename: Calling API with old="${currentInstance}", new="${newName}"`);
-        const result = await window.electronAPI.renameInstance(currentInstance, newName);
+        console.log(`Rename: Calling API with old="${renameTargetInstance}", new="${newName}"`);
+        const result = await window.electronAPI.renameInstance(renameTargetInstance, newName);
         console.log('Rename: API result:', result);
         
         if (result.success) {
-            instances[newName] = instances[currentInstance];
-            delete instances[currentInstance];
+            instances[newName] = instances[renameTargetInstance];
+            delete instances[renameTargetInstance];
             currentInstance = newName;
             renderInstances();
             selectInstance(newName);
+            closeModal('rename-modal');
             console.log('Rename: Success');
         } else {
             console.error('Rename: Failed:', result.error);
@@ -448,6 +463,10 @@ async function renameInstance() {
         console.error('Rename: Error:', error);
         alert(`Rename error: ${error.message}`);
     }
+}
+
+async function renameInstance() {
+    openRenameModal();
 }
 
 async function deleteInstance() {
@@ -666,9 +685,9 @@ async function launchGame() {
             console.log('Launch result:', result);
             
             if (result.success) {
-                // Retry checking status up to 30 times (backend may take time to register process)
+                // Retry checking status many times (Fabric installation can take a while)
                 let launchCheckAttempts = 0;
-                const maxLaunchChecks = 30;
+                const maxLaunchChecks = 300;  // 300 * 500ms = 2.5 minutes max
                 
                 async function checkLaunchStatus() {
                     try {
@@ -681,19 +700,25 @@ async function launchGame() {
                         
                         launchCheckAttempts++;
                         if (launchCheckAttempts < maxLaunchChecks) {
-                            setTimeout(checkLaunchStatus, 200);
+                            // Update status text periodically
+                            if (launchCheckAttempts % 10 === 0) {
+                                elements.statusText.textContent = `Installing... (${Math.round(launchCheckAttempts * 0.5)}s)`;
+                            }
+                            setTimeout(checkLaunchStatus, 500);  // Check every 500ms
                         } else {
-                            // Process didn't register but launch succeeded - still show as running
-                            updateLaunchButtonState(true);
-                            pollInstanceStatus();
+                            // Max attempts reached - installation probably failed
+                            elements.statusText.textContent = 'Launch timeout - check console';
+                            updateLaunchButtonState(false);
+                            elements.launchBtn.disabled = false;
                         }
                     } catch (err) {
                         launchCheckAttempts++;
                         if (launchCheckAttempts < maxLaunchChecks) {
-                            setTimeout(checkLaunchStatus, 200);
+                            setTimeout(checkLaunchStatus, 500);
                         } else {
-                            updateLaunchButtonState(true);
-                            pollInstanceStatus();
+                            elements.statusText.textContent = 'Launch timeout - check console';
+                            updateLaunchButtonState(false);
+                            elements.launchBtn.disabled = false;
                         }
                     }
                 }
