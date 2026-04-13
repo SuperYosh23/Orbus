@@ -312,6 +312,15 @@ class APIHandler(BaseHTTPRequestHandler):
                 except Exception as e:
                     self.send_json_response({"error": str(e)}, 500)
         
+        elif path.startswith('/api/instances/') and path.endswith('/status'):
+            # Check if instance is running
+            parts = path.split('/')
+            name = parts[3]
+            
+            is_running = name in launch_processes
+            print(f"[Status Check] {name}: {'running' if is_running else 'not running'}")
+            self.send_json_response({"running": is_running})
+        
         else:
             self.send_json_response({"error": "Not found"}, 404)
     
@@ -392,18 +401,26 @@ class APIHandler(BaseHTTPRequestHandler):
                         minecraft_launcher_lib.quilt.install_quilt(v, MINECRAFT_DIR)
                         l_id = f"quilt-loader-{v}"
                     
-                    # Determine Java path
+                    # Determine Java path - priority: instance > settings default > system
                     if custom_java and os.path.exists(custom_java):
                         java = custom_java
                     else:
-                        if sys.platform.startswith("linux"):
-                            java_path = shutil.which("java") or shutil.which("javaw")
-                        else:
-                            java_path = shutil.which("javaw") or shutil.which("java")
+                        # Check for default Java in settings
+                        settings = load_settings()
+                        default_java = settings.get("default_java", "").strip()
                         
-                        if not java_path:
-                            raise Exception("Java not found in PATH")
-                        java = os.path.abspath(java_path)
+                        if default_java and os.path.exists(default_java):
+                            java = default_java
+                        else:
+                            # Fall back to system Java
+                            if sys.platform.startswith("linux"):
+                                java_path = shutil.which("java") or shutil.which("javaw")
+                            else:
+                                java_path = shutil.which("javaw") or shutil.which("java")
+                            
+                            if not java_path:
+                                raise Exception("Java not found in PATH")
+                            java = os.path.abspath(java_path)
                     
                     # Launch options
                     import uuid as uuidlib

@@ -23,6 +23,16 @@
     background-color: var(--viso-bg-primary);
 }
 
+/* Sidebar on Right */
+.app-container.sidebar-right {
+    flex-direction: row-reverse;
+}
+
+.app-container.sidebar-right .sidebar {
+    border-right: none;
+    border-left: 1px solid var(--glass-border);
+}
+
 /* Sidebar */
 .sidebar {
     width: 240px;

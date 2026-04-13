@@ -12,7 +12,7 @@
     <div id="app" class="app-container">
         <!-- Sidebar -->
         <aside class="sidebar">
-            <div class="sidebar-header">
+            <div class="sidebar-header" id="sidebar-logo">
                 <div class="logo-container">
                     <img src="../../assets/icon.png" alt="Orbus" class="logo" onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='flex'">
                     <div id="logo-fallback" class="logo-fallback" style="display: none;">
@@ -26,9 +26,7 @@
                 <div class="instances-header">
                     <span class="viso-label">My Instances</span>
                     <button class="viso-btn viso-btn-icon viso-btn-glass viso-btn-sm" id="add-instance-btn" title="Add Instance">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                        </svg>
+                        <i class="fas fa-plus"></i>
                     </button>
                 </div>
                 <div class="instances-list" id="instances-list">
@@ -38,20 +36,15 @@
 
             <div class="sidebar-actions">
                 <button class="viso-btn viso-btn-secondary viso-btn-sm" id="import-btn">
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 8px;">
-                        <path d="M8 12V4M4 8l4-4 4 4M2 14h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-                    </svg>
+                    <i class="fas fa-file-import" style="margin-right: 8px;"></i>
                     Import .zip/.mrpack
                 </button>
                 <button class="viso-btn viso-btn-sm modrinth-btn" id="browse-modrinth-btn">
                     <i class="fas fa-search" style="margin-right: 8px;"></i>
                     Browse Modrinth
                 </button>
-                <button class="viso-btn viso-btn-ghost viso-btn-sm" id="settings-btn">
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 8px;">
-                        <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.5" fill="none"/>
-                        <path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M3.5 12.5l1.5-1.5M11 5l1.5-1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                    </svg>
+                <button class="viso-btn viso-btn-secondary viso-btn-sm" id="settings-btn">
+                    <i class="fas fa-cog" style="margin-right: 8px;"></i>
                     Settings
                 </button>
             </div>
@@ -62,7 +55,6 @@
             <!-- No Instance Selected View -->
             <div id="no-instance-view" class="no-instance-view">
                 <div class="viso-card" style="text-align: center; max-width: 400px;">
-                    <div style="font-size: 48px; margin-bottom: 16px;">🎮</div>
                     <h2 class="viso-h2">Select an Instance</h2>
                     <p class="viso-body">Choose an instance from the sidebar or create a new one to get started.</p>
                 </div>
@@ -215,22 +207,31 @@
                 </div>
                 <div class="tab-content">
                     <div id="appearance-tab" class="tab-panel active">
-                        <div class="form-group">
-                            <label class="viso-label">Corner Radius</label>
-                            <div class="viso-slider-container">
-                                <input type="range" class="viso-slider" id="corner-radius-slider" min="0" max="20" value="8" step="1">
-                                <span class="viso-slider-percent" id="corner-radius-value">8px</span>
-                            </div>
-                        </div>
                         <label class="viso-checkbox-label">
                             <input type="checkbox" id="show-logo-checkbox" checked>
                             <span>Show Orbus Logo</span>
                         </label>
+                        <div style="margin-top: 16px;">
+                            <div class="viso-flex viso-items-center viso-gap-3">
+                                <label class="viso-label" style="margin: 0;">Sidebar Position</label>
+                                <label class="viso-toggle-neutral">
+                                    <input type="checkbox" id="sidebar-right-checkbox" data-off="Left" data-on="Right">
+                                </label>
+                            </div>
+                        </div>
                     </div>
                     <div id="defaults-tab" class="tab-panel">
                         <div class="form-group">
                             <label class="viso-label">Default Username</label>
                             <input type="text" class="viso-input" id="default-username-input" placeholder="Enter default username...">
+                        </div>
+                        <div class="form-group" style="margin-top: 16px;">
+                            <label class="viso-label">Default Java Path</label>
+                            <div class="java-input-group">
+                                <input type="text" class="viso-input" id="default-java-input" placeholder="System default (java)">
+                                <button class="viso-btn viso-btn-secondary viso-btn-sm" id="default-auto-java-btn">Auto Detect</button>
+                                <button class="viso-btn viso-btn-glass viso-btn-sm" id="default-browse-java-btn">Browse</button>
+                            </div>
                         </div>
                     </div>
                 </div>

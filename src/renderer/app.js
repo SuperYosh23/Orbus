@@ -132,6 +132,14 @@ function renderInstances() {
 
 // Select instance
 async function selectInstance(name) {
+    if (!instances[name]) return;
+    
+    // Clear any pending poll timeout from previous instance
+    if (pollTimeoutId) {
+        clearTimeout(pollTimeoutId);
+        pollTimeoutId = null;
+    }
+    
     currentInstance = name;
     const instance = instances[name];
     
@@ -152,15 +160,17 @@ async function selectInstance(name) {
     updateRamDisplay();
     toggleLoaderSettings();
     
-    // Check if instance is running and update button
+    // Check if instance is running and update button (single check, no retries)
     try {
+        console.log(`[Select] Checking status for: ${name}`);
         const result = await window.electronAPI.isInstanceRunning(name);
+        console.log(`[Select] Status result:`, result);
         updateLaunchButtonState(result.running);
         if (result.running) {
             pollInstanceStatus();
         }
     } catch (error) {
-        console.error('Error checking instance status:', error);
+        console.error('[Select] Error checking instance status:', error);
         updateLaunchButtonState(false);
     }
     
@@ -249,13 +259,62 @@ function setupEventListeners() {
     elements.ramSlider.addEventListener('input', updateRamDisplay);
     elements.ramSlider.addEventListener('change', saveCurrentInstance);
     
-    // Java buttons
+    // Java buttons (instance settings)
     document.getElementById('auto-java-btn').addEventListener('click', openJavaDetector);
     document.getElementById('browse-java-btn').addEventListener('click', async () => {
         const result = await window.electronAPI.selectJava();
         if (!result.canceled && result.filePaths.length > 0) {
             elements.javaInput.value = result.filePaths[0];
             saveCurrentInstance();
+        }
+    });
+    
+    // Default Java buttons (settings modal)
+    document.getElementById('default-auto-java-btn').addEventListener('click', async () => {
+        const javaList = document.getElementById('java-list');
+        const scanningDiv = document.getElementById('java-scanning');
+        const resultsDiv = document.getElementById('java-results');
+        
+        scanningDiv.style.display = 'flex';
+        resultsDiv.style.display = 'none';
+        openModal('java-modal');
+        
+        try {
+            const result = await window.electronAPI.getJavaInstallations(false);
+            scanningDiv.style.display = 'none';
+            resultsDiv.style.display = 'block';
+            
+            if (result.success && result.data.length > 0) {
+                javaList.innerHTML = result.data.map(java => `
+                    <div class="java-item">
+                        <div class="java-info">
+                            <div class="java-version">Java ${java.version} (${java.arch})</div>
+                            <div class="java-path">${java.path}</div>
+                        </div>
+                        <button class="viso-btn viso-btn-primary viso-btn-sm select-default-java-btn" data-path="${java.path}">Select</button>
+                    </div>
+                `).join('');
+                
+                javaList.querySelectorAll('.select-default-java-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.getElementById('default-java-input').value = btn.dataset.path;
+                        closeModal('java-modal');
+                    });
+                });
+            } else {
+                javaList.innerHTML = '<p class="viso-body" style="text-align: center;">No Java installations found.</p>';
+            }
+        } catch (error) {
+            scanningDiv.style.display = 'none';
+            resultsDiv.style.display = 'block';
+            javaList.innerHTML = '<p class="viso-body" style="text-align: center; color: var(--viso-red);">Error scanning for Java.</p>';
+        }
+    });
+    
+    document.getElementById('default-browse-java-btn').addEventListener('click', async () => {
+        const result = await window.electronAPI.selectJava();
+        if (!result.canceled && result.filePaths.length > 0) {
+            document.getElementById('default-java-input').value = result.filePaths[0];
         }
     });
     
@@ -283,14 +342,6 @@ function setupEventListeners() {
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => switchTab(btn.dataset.tab));
     });
-    
-    // Corner radius slider
-    const cornerSlider = document.getElementById('corner-radius-slider');
-    if (cornerSlider) {
-        cornerSlider.addEventListener('input', (e) => {
-            document.getElementById('corner-radius-value').textContent = `${e.target.value}px`;
-        });
-    }
     
     // Modrinth search
     document.getElementById('modrinth-search-btn').addEventListener('click', searchModrinth);
@@ -356,22 +407,46 @@ async function addInstance() {
 }
 
 async function renameInstance() {
-    if (!currentInstance) return;
+    if (!currentInstance) {
+        console.log('Rename: No instance selected');
+        return;
+    }
     
     const newName = prompt(`Rename "${currentInstance}" to:`, currentInstance);
-    if (!newName || newName === currentInstance || instances[newName]) return;
+    console.log(`Rename: Prompt returned "${newName}"`);
+    
+    if (!newName) {
+        console.log('Rename: Cancelled or empty name');
+        return;
+    }
+    if (newName === currentInstance) {
+        console.log('Rename: Same name');
+        return;
+    }
+    if (instances[newName]) {
+        alert(`Instance "${newName}" already exists!`);
+        return;
+    }
     
     try {
+        console.log(`Rename: Calling API with old="${currentInstance}", new="${newName}"`);
         const result = await window.electronAPI.renameInstance(currentInstance, newName);
+        console.log('Rename: API result:', result);
+        
         if (result.success) {
             instances[newName] = instances[currentInstance];
             delete instances[currentInstance];
             currentInstance = newName;
             renderInstances();
             selectInstance(newName);
+            console.log('Rename: Success');
+        } else {
+            console.error('Rename: Failed:', result.error);
+            alert(`Rename failed: ${result.error}`);
         }
     } catch (error) {
-        console.error('Error renaming instance:', error);
+        console.error('Rename: Error:', error);
+        alert(`Rename error: ${error.message}`);
     }
 }
 
@@ -516,12 +591,13 @@ function handleDragEnd() {
 
 // Track if instance is currently running
 let isInstanceRunning = false;
+let pollTimeoutId = null;
 
 // Update launch button state
 function updateLaunchButtonState(running) {
+    console.log(`[Button State] Setting to: ${running ? 'KILL' : 'LAUNCH'}`);
     isInstanceRunning = running;
     const btn = elements.launchBtn;
-    const btnText = document.getElementById('launch-btn-text');
     
     if (running) {
         // Change to kill button
@@ -556,6 +632,11 @@ async function launchGame() {
             if (result.success) {
                 updateLaunchButtonState(false);
                 elements.statusText.textContent = 'Instance killed';
+                // Clear any pending poll timeout
+                if (pollTimeoutId) {
+                    clearTimeout(pollTimeoutId);
+                    pollTimeoutId = null;
+                }
             } else {
                 elements.launchBtn.disabled = false;
                 alert(`Kill failed: ${result.error}`);
@@ -585,9 +666,39 @@ async function launchGame() {
             console.log('Launch result:', result);
             
             if (result.success) {
-                updateLaunchButtonState(true);
-                // Poll for when game ends
-                pollInstanceStatus();
+                // Retry checking status up to 30 times (backend may take time to register process)
+                let launchCheckAttempts = 0;
+                const maxLaunchChecks = 30;
+                
+                async function checkLaunchStatus() {
+                    try {
+                        const statusResult = await window.electronAPI.isInstanceRunning(currentInstance);
+                        if (statusResult.running) {
+                            updateLaunchButtonState(true);
+                            pollInstanceStatus();
+                            return;
+                        }
+                        
+                        launchCheckAttempts++;
+                        if (launchCheckAttempts < maxLaunchChecks) {
+                            setTimeout(checkLaunchStatus, 200);
+                        } else {
+                            // Process didn't register but launch succeeded - still show as running
+                            updateLaunchButtonState(true);
+                            pollInstanceStatus();
+                        }
+                    } catch (err) {
+                        launchCheckAttempts++;
+                        if (launchCheckAttempts < maxLaunchChecks) {
+                            setTimeout(checkLaunchStatus, 200);
+                        } else {
+                            updateLaunchButtonState(true);
+                            pollInstanceStatus();
+                        }
+                    }
+                }
+                
+                checkLaunchStatus();
             } else {
                 elements.statusText.textContent = 'Launch failed';
                 updateLaunchButtonState(false);
@@ -605,20 +716,28 @@ async function launchGame() {
 
 // Poll to check if instance is still running
 async function pollInstanceStatus() {
-    if (!currentInstance || !isInstanceRunning) return;
+    if (!currentInstance || !isInstanceRunning) {
+        console.log(`[Poll] Skipping - currentInstance: ${currentInstance}, isInstanceRunning: ${isInstanceRunning}`);
+        return;
+    }
     
     try {
+        console.log(`[Poll] Checking status for: ${currentInstance}`);
         const result = await window.electronAPI.isInstanceRunning(currentInstance);
+        console.log(`[Poll] Status result:`, result);
         if (!result.running) {
             // Instance stopped
+            console.log(`[Poll] Instance stopped, resetting button`);
             updateLaunchButtonState(false);
             elements.statusText.textContent = 'Game stopped';
+            pollTimeoutId = null;
         } else {
-            // Still running, poll again in 2 seconds
-            setTimeout(pollInstanceStatus, 2000);
+            // Still running, poll again in 0.2 seconds
+            console.log(`[Poll] Still running, scheduling next check`);
+            pollTimeoutId = setTimeout(pollInstanceStatus, 200);
         }
     } catch (error) {
-        console.error('Error polling status:', error);
+        console.error('[Poll] Error polling status:', error);
     }
 }
 
@@ -758,19 +877,20 @@ async function importModpack() {
 
 // Settings
 function openSettings() {
-    document.getElementById('corner-radius-slider').value = settings.corner_radius || 8;
-    document.getElementById('corner-radius-value').textContent = `${settings.corner_radius || 8}px`;
     document.getElementById('show-logo-checkbox').checked = settings.show_logo !== false;
+    document.getElementById('sidebar-right-checkbox').checked = settings.sidebar_right || false;
     document.getElementById('default-username-input').value = settings.default_username || '';
+    document.getElementById('default-java-input').value = settings.default_java || '';
     
     openModal('settings-modal');
 }
 
 async function saveSettings() {
     const newSettings = {
-        corner_radius: parseInt(document.getElementById('corner-radius-slider').value),
         show_logo: document.getElementById('show-logo-checkbox').checked,
-        default_username: document.getElementById('default-username-input').value
+        sidebar_right: document.getElementById('sidebar-right-checkbox').checked,
+        default_username: document.getElementById('default-username-input').value,
+        default_java: document.getElementById('default-java-input').value
     };
     
     try {
@@ -790,9 +910,10 @@ async function resetSettings() {
     if (!confirm('Reset all settings to defaults?')) return;
     
     const defaultSettings = {
-        corner_radius: 8,
         show_logo: true,
-        default_username: ''
+        sidebar_right: false,
+        default_username: '',
+        default_java: ''
     };
     
     try {
@@ -806,8 +927,19 @@ async function resetSettings() {
 }
 
 function applySettings() {
-    const radius = settings.corner_radius || 8;
-    document.documentElement.style.setProperty('--radius-md', `${radius}px`);
+    // Apply sidebar position
+    const appContainer = document.getElementById('app');
+    if (settings.sidebar_right) {
+        appContainer.classList.add('sidebar-right');
+    } else {
+        appContainer.classList.remove('sidebar-right');
+    }
+    
+    // Apply show logo
+    const logoHeader = document.getElementById('sidebar-logo');
+    if (logoHeader) {
+        logoHeader.style.display = settings.show_logo !== false ? 'flex' : 'none';
+    }
 }
 
 function switchTab(tabName) {

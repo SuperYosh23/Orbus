@@ -52,11 +52,18 @@ function startPythonBackend() {
     console.log(`[Python] ${output.trim()}`);
     
     // Forward console logs to console window if it exists
+    // Filter out status checks and internal messages - only show Minecraft game output
     if (consoleWindow && !consoleWindow.isDestroyed()) {
       const lines = output.split('\n');
       for (const line of lines) {
-        if (line.trim()) {
-          consoleWindow.webContents.send('console-log', { line: line.trim() });
+        const trimmed = line.trim();
+        if (trimmed && 
+            !trimmed.includes('[Status Check]') && 
+            !trimmed.includes('[Kill Request]') &&
+            !trimmed.includes('[Launch] Stored process') &&
+            !trimmed.includes('[Launch] Removed process') &&
+            !trimmed.includes('[Launch] Error')) {
+          consoleWindow.webContents.send('console-log', { line: trimmed });
         }
       }
     }
@@ -266,7 +273,18 @@ ipcMain.handle('kill-instance', async (event, name) => {
 });
 
 ipcMain.handle('is-instance-running', async (event, name) => {
-  return { running: runningInstances.has(name) };
+  // Query the backend for actual process status
+  const result = await backendRequest(`/api/instances/${name}/status`);
+  if (result.success) {
+    // Sync local tracking with backend status
+    if (result.data.running) {
+      runningInstances.set(name, true);
+    } else {
+      runningInstances.delete(name);
+    }
+    return { running: result.data.running };
+  }
+  return { running: false };
 });
 
 ipcMain.handle('get-versions', async () => {
