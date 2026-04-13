@@ -406,11 +406,12 @@ class APIHandler(BaseHTTPRequestHandler):
                         java = os.path.abspath(java_path)
                     
                     # Launch options
+                    import uuid as uuidlib
                     jvm_args = [f"-Xmx{ram}G", f"-Xms{ram}G", "-XX:+UseG1GC"]
                     opts = {
                         "username": user,
-                        "uuid": "0",
-                        "token": "0",
+                        "uuid": str(uuidlib.uuid3(uuidlib.NAMESPACE_DNS, user)),  # Generate valid UUID from username
+                        "token": "",
                         "gameDir": target_dir,
                         "executablePath": java,
                         "jvmArguments": jvm_args
@@ -438,13 +439,27 @@ class APIHandler(BaseHTTPRequestHandler):
                     
                     launch_processes[name] = process
                     
-                    # Stream output if console logs enabled
-                    if instance.get("show_console_logs", False):
-                        for line in iter(process.stdout.readline, ""):
-                            print(f"[{name}] {line}", end="")
-                        process.stdout.close()
+                    # Stream output to both console and log file
+                    log_lines = []
+                    def stream_output(stream):
+                        for line in iter(stream.readline, ""):
+                            log_lines.append(line)
+                            print(f"[{name}] {line}", end="", flush=True)
+                        stream.close()
                     
+                    # Start output streaming thread
+                    output_thread = threading.Thread(target=stream_output, args=(process.stdout,))
+                    output_thread.daemon = True
+                    output_thread.start()
+                    
+                    # Wait for process
                     process.wait()
+                    
+                    # Save log to file
+                    log_dir = os.path.join(target_dir, "logs")
+                    os.makedirs(log_dir, exist_ok=True)
+                    with open(os.path.join(log_dir, "latest.log"), "w") as f:
+                        f.writelines(log_lines)
                     
                     if name in launch_processes:
                         del launch_processes[name]

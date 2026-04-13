@@ -44,5 +44,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   onDownloadProgress: (callback) => {
     ipcRenderer.on('download-progress', (event, data) => callback(data));
+  },
+  onConsoleLog: (callback) => {
+    ipcRenderer.on('console-log', (event, data) => callback(data));
+  },
+  removeConsoleLogListener: () => {
+    ipcRenderer.removeAllListeners('console-log');
   }
 });

@@ -46,7 +46,18 @@ function startPythonBackend() {
   });
   
   pythonBackend.stdout.on('data', (data) => {
-    console.log(`[Python] ${data.toString().trim()}`);
+    const output = data.toString();
+    console.log(`[Python] ${output.trim()}`);
+    
+    // Forward console logs to renderer if window exists
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      const lines = output.split('\n');
+      for (const line of lines) {
+        if (line.trim()) {
+          mainWindow.webContents.send('console-log', { line: line.trim() });
+        }
+      }
+    }
   });
   
   pythonBackend.stderr.on('data', (data) => {
@@ -79,8 +90,13 @@ function createWindow() {
     },
     backgroundColor: '#0d1117',
     show: false,
-    titleBarStyle: 'hiddenInset'
+    titleBarStyle: 'hiddenInset',
+    autoHideMenuBar: true,
+    menuBarVisible: false
   });
+  
+  // Remove the menu bar completely
+  mainWindow.setMenuBarVisibility(false);
 
   // Load the renderer
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
@@ -99,6 +115,11 @@ function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
+  });
+  
+  // Handle window closed
+  mainWindow.on('closed', () => {
+    mainWindow = null;
   });
 }
 
@@ -172,8 +193,11 @@ app.on('before-quit', () => {
 // Helper function for backend requests
 async function backendRequest(endpoint, method = 'GET', data = null) {
   try {
-    // URL-encode the endpoint path to handle special characters in instance names
-    const encodedEndpoint = endpoint.split('/').map(part => encodeURIComponent(part)).join('/');
+    // Split endpoint into path and query, encode only the path parts
+    const [pathPart, queryPart] = endpoint.split('?');
+    const encodedPath = pathPart.split('/').map(part => encodeURIComponent(part)).join('/');
+    const encodedEndpoint = queryPart ? `${encodedPath}?${queryPart}` : encodedPath;
+    
     const config = {
       method,
       url: `${backendUrl}${encodedEndpoint}`,
@@ -264,7 +288,9 @@ ipcMain.handle('save-settings', async (event, settings) => {
 });
 
 ipcMain.handle('get-java-installations', async (event, deep = false) => {
-  return await backendRequest(`/api/java/detect?deep=${deep}`);
+  const result = await backendRequest(`/api/java/detect?deep=${deep}`);
+  console.log('Java detect result:', result);
+  return result;
 });
 
 ipcMain.handle('open-folder', async (event, folderPath) => {

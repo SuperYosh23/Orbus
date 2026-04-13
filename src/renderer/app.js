@@ -47,7 +47,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupEventListeners();
     setupModals();
     setupDragAndDrop();
+    setupConsoleLogListener();
 });
+
+// Setup console log listener
+function setupConsoleLogListener() {
+    window.electronAPI.onConsoleLog((data) => {
+        if (elements.consoleWindow.style.display !== 'none') {
+            const line = document.createElement('div');
+            line.className = 'console-line';
+            line.textContent = data.line;
+            elements.consoleContent.appendChild(line);
+            elements.consoleContent.scrollTop = elements.consoleContent.scrollHeight;
+        }
+    });
+}
 
 // Load initial data
 async function loadData() {
