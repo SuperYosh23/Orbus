@@ -438,6 +438,7 @@ class APIHandler(BaseHTTPRequestHandler):
                     )
                     
                     launch_processes[name] = process
+                    print(f"[Launch] Stored process for {name}. Running: {list(launch_processes.keys())}")
                     
                     # Stream output to both console and log file
                     log_lines = []
@@ -463,14 +464,58 @@ class APIHandler(BaseHTTPRequestHandler):
                     
                     if name in launch_processes:
                         del launch_processes[name]
+                        print(f"[Launch] Removed process for {name}. Game ended.")
                     
                 except Exception as e:
-                    print(f"Launch error: {e}")
+                    print(f"[Launch] Error: {e}")
+                    if name in launch_processes:
+                        del launch_processes[name]
             
             thread = threading.Thread(target=launch, daemon=True)
             thread.start()
             
             self.send_json_response({"success": True})
+        
+        elif path.startswith('/api/instances/') and path.endswith('/kill'):
+            # Kill running instance
+            parts = path.split('/')
+            name = parts[3]
+            
+            print(f"[Kill Request] Attempting to kill: {name}")
+            print(f"[Kill Request] Running processes: {list(launch_processes.keys())}")
+            
+            if name in launch_processes:
+                process = None
+                try:
+                    process = launch_processes[name]
+                    print(f"[Kill Request] Found process for {name}, terminating...")
+                    
+                    # Try graceful termination first
+                    process.terminate()
+                    
+                    # Wait a bit, then kill if still running
+                    try:
+                        process.wait(timeout=3)
+                        print(f"[Kill Request] Process terminated gracefully")
+                    except subprocess.TimeoutExpired:
+                        print(f"[Kill Request] Process didn't terminate, forcing kill...")
+                        try:
+                            process.kill()
+                            process.wait()
+                        except:
+                            pass  # Process already gone
+                    
+                except Exception as e:
+                    print(f"[Kill Request] Error during termination: {e}")
+                finally:
+                    # Always remove from tracking and return success
+                    if name in launch_processes:
+                        del launch_processes[name]
+                        print(f"[Kill Request] Removed {name} from tracking")
+                    self.send_json_response({"success": True})
+            else:
+                print(f"[Kill Request] Instance {name} not found in running processes")
+                self.send_json_response({"error": "Instance not running"}, 400)
         
         elif path.startswith('/api/instances/') and path.endswith('/rename'):
             # Rename instance

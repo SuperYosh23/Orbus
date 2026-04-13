@@ -32,8 +32,6 @@ const elements = {
     modrinthModal: document.getElementById('modrinth-modal'),
     settingsModal: document.getElementById('settings-modal'),
     javaModal: document.getElementById('java-modal'),
-    consoleWindow: document.getElementById('console-window'),
-    consoleContent: document.getElementById('console-content'),
     
     // Modrinth
     modrinthSearch: document.getElementById('modrinth-search'),
@@ -47,21 +45,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupEventListeners();
     setupModals();
     setupDragAndDrop();
-    setupConsoleLogListener();
 });
-
-// Setup console log listener
-function setupConsoleLogListener() {
-    window.electronAPI.onConsoleLog((data) => {
-        if (elements.consoleWindow.style.display !== 'none') {
-            const line = document.createElement('div');
-            line.className = 'console-line';
-            line.textContent = data.line;
-            elements.consoleContent.appendChild(line);
-            elements.consoleContent.scrollTop = elements.consoleContent.scrollHeight;
-        }
-    });
-}
 
 // Load initial data
 async function loadData() {
@@ -147,7 +131,7 @@ function renderInstances() {
 }
 
 // Select instance
-function selectInstance(name) {
+async function selectInstance(name) {
     currentInstance = name;
     const instance = instances[name];
     
@@ -167,6 +151,18 @@ function selectInstance(name) {
     
     updateRamDisplay();
     toggleLoaderSettings();
+    
+    // Check if instance is running and update button
+    try {
+        const result = await window.electronAPI.isInstanceRunning(name);
+        updateLaunchButtonState(result.running);
+        if (result.running) {
+            pollInstanceStatus();
+        }
+    } catch (error) {
+        console.error('Error checking instance status:', error);
+        updateLaunchButtonState(false);
+    }
     
     // Update active state in list
     renderInstances();
@@ -278,11 +274,6 @@ function setupEventListeners() {
     
     // Launch button
     elements.launchBtn.addEventListener('click', launchGame);
-    
-    // Console close
-    document.getElementById('console-close').addEventListener('click', () => {
-        elements.consoleWindow.style.display = 'none';
-    });
     
     // Settings modal
     document.getElementById('settings-save').addEventListener('click', saveSettings);
@@ -523,58 +514,111 @@ function handleDragEnd() {
     });
 }
 
-// Launch game
+// Track if instance is currently running
+let isInstanceRunning = false;
+
+// Update launch button state
+function updateLaunchButtonState(running) {
+    isInstanceRunning = running;
+    const btn = elements.launchBtn;
+    const btnText = document.getElementById('launch-btn-text');
+    
+    if (running) {
+        // Change to kill button
+        btn.className = 'viso-btn viso-btn-danger viso-btn-lg';
+        btn.innerHTML = '<i class="fas fa-stop" style="margin-right: 8px;"></i><span id="launch-btn-text">KILL INSTANCE</span>';
+        btn.disabled = false;
+        elements.statusText.textContent = 'Game running';
+    } else {
+        // Change to launch button
+        btn.className = 'viso-btn viso-btn-primary viso-btn-lg';
+        btn.innerHTML = '<i class="fas fa-play" style="margin-right: 8px;"></i><span id="launch-btn-text">LAUNCH GAME</span>';
+        btn.disabled = false;
+        elements.statusText.textContent = 'Ready';
+    }
+}
+
+// Launch or kill game
 async function launchGame() {
     if (!currentInstance) {
-        console.log('Launch: No instance selected');
+        console.log('Launch/Kill: No instance selected');
         return;
     }
     
-    console.log(`Launching instance: ${currentInstance}`);
-    await saveCurrentInstance();
-    
-    elements.launchBtn.disabled = true;
-    elements.launchBtn.innerHTML = '<div class="btn-spinner"></div> Launching...';
-    elements.statusText.textContent = 'Preparing launch...';
-    elements.launchProgress.style.display = 'block';
-    
-    if (elements.showLogsCheckbox.checked) {
-        elements.consoleWindow.style.display = 'flex';
-        elements.consoleContent.innerHTML = '';
+    if (isInstanceRunning) {
+        // Kill the instance
+        console.log(`Killing instance: ${currentInstance}`);
+        try {
+            elements.launchBtn.disabled = true;
+            const result = await window.electronAPI.killInstance(currentInstance);
+            console.log('Kill result:', result);
+            
+            if (result.success) {
+                updateLaunchButtonState(false);
+                elements.statusText.textContent = 'Instance killed';
+            } else {
+                elements.launchBtn.disabled = false;
+                alert(`Kill failed: ${result.error}`);
+            }
+        } catch (error) {
+            elements.launchBtn.disabled = false;
+            console.error('Kill error:', error);
+            alert(`Kill error: ${error.message}`);
+        }
+    } else {
+        // Launch the instance
+        console.log(`Launching instance: ${currentInstance}`);
+        await saveCurrentInstance();
+        
+        elements.launchBtn.disabled = true;
+        elements.launchBtn.innerHTML = '<div class="btn-spinner"></div> Launching...';
+        elements.statusText.textContent = 'Preparing launch...';
+        elements.launchProgress.style.display = 'block';
+        
+        if (elements.showLogsCheckbox.checked) {
+            window.electronAPI.openConsole();
+        }
+        
+        try {
+            console.log('Calling launchInstance API...');
+            const result = await window.electronAPI.launchInstance(currentInstance);
+            console.log('Launch result:', result);
+            
+            if (result.success) {
+                updateLaunchButtonState(true);
+                // Poll for when game ends
+                pollInstanceStatus();
+            } else {
+                elements.statusText.textContent = 'Launch failed';
+                updateLaunchButtonState(false);
+                console.error('Launch failed:', result.error);
+                alert(`Launch failed: ${result.error}`);
+            }
+        } catch (error) {
+            elements.statusText.textContent = 'Launch error';
+            updateLaunchButtonState(false);
+            console.error('Launch error:', error);
+            alert(`Launch error: ${error.message}`);
+        }
     }
+}
+
+// Poll to check if instance is still running
+async function pollInstanceStatus() {
+    if (!currentInstance || !isInstanceRunning) return;
     
     try {
-        console.log('Calling launchInstance API...');
-        const result = await window.electronAPI.launchInstance(currentInstance);
-        console.log('Launch result:', result);
-        
-        if (result.success) {
-            elements.statusText.textContent = 'Game running';
-            console.log('Launch successful - game should start');
-            // The window will be hidden by the backend
+        const result = await window.electronAPI.isInstanceRunning(currentInstance);
+        if (!result.running) {
+            // Instance stopped
+            updateLaunchButtonState(false);
+            elements.statusText.textContent = 'Game stopped';
         } else {
-            elements.statusText.textContent = 'Launch failed';
-            elements.launchBtn.disabled = false;
-            elements.launchBtn.innerHTML = `
-                <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 8px;">
-                    <path d="M3 2l10 6-10 6V2z" fill="currentColor"/>
-                </svg>
-                LAUNCH GAME
-            `;
-            console.error('Launch failed:', result.error);
-            alert(`Launch failed: ${result.error}`);
+            // Still running, poll again in 2 seconds
+            setTimeout(pollInstanceStatus, 2000);
         }
     } catch (error) {
-        elements.statusText.textContent = 'Launch error';
-        elements.launchBtn.disabled = false;
-        elements.launchBtn.innerHTML = `
-            <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 8px;">
-                <path d="M3 2l10 6-10 6V2z" fill="currentColor"/>
-            </svg>
-            LAUNCH GAME
-        `;
-        console.error('Launch error:', error);
-        alert(`Launch error: ${error.message}`);
+        console.error('Error polling status:', error);
     }
 }
 

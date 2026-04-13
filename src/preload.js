@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   renameInstance: (oldName, newName) => ipcRenderer.invoke('rename-instance', oldName, newName),
   reorderInstances: (order) => ipcRenderer.invoke('reorder-instances', order),
   launchInstance: (name) => ipcRenderer.invoke('launch-instance', name),
+  killInstance: (name) => ipcRenderer.invoke('kill-instance', name),
+  isInstanceRunning: (name) => ipcRenderer.invoke('is-instance-running', name),
   
   // Versions
   getVersions: () => ipcRenderer.invoke('get-versions'),
@@ -37,6 +39,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // System
   openFolder: (path) => ipcRenderer.invoke('open-folder', path),
   getPlatform: () => ipcRenderer.invoke('get-platform'),
+  openConsole: () => ipcRenderer.invoke('open-console'),
   
   // Event listeners
   onLaunchStatus: (callback) => {

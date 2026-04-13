@@ -6,7 +6,9 @@ const fs = require('fs');
 
 // Global reference to prevent garbage collection
 let mainWindow;
+let consoleWindow;
 let pythonBackend;
+let runningInstances = new Map(); // Track running game processes
 
 // Backend port
 const BACKEND_PORT = 15556;
@@ -49,12 +51,12 @@ function startPythonBackend() {
     const output = data.toString();
     console.log(`[Python] ${output.trim()}`);
     
-    // Forward console logs to renderer if window exists
-    if (mainWindow && !mainWindow.isDestroyed()) {
+    // Forward console logs to console window if it exists
+    if (consoleWindow && !consoleWindow.isDestroyed()) {
       const lines = output.split('\n');
       for (const line of lines) {
         if (line.trim()) {
-          mainWindow.webContents.send('console-log', { line: line.trim() });
+          consoleWindow.webContents.send('console-log', { line: line.trim() });
         }
       }
     }
@@ -247,7 +249,24 @@ ipcMain.handle('reorder-instances', async (event, order) => {
 });
 
 ipcMain.handle('launch-instance', async (event, name) => {
-  return await backendRequest(`/api/instances/${name}/launch`, 'POST');
+  const result = await backendRequest(`/api/instances/${name}/launch`, 'POST');
+  if (result.success) {
+    runningInstances.set(name, true);
+  }
+  return result;
+});
+
+ipcMain.handle('kill-instance', async (event, name) => {
+  // Kill the process via backend
+  const result = await backendRequest(`/api/instances/${name}/kill`, 'POST');
+  if (result.success) {
+    runningInstances.delete(name);
+  }
+  return result;
+});
+
+ipcMain.handle('is-instance-running', async (event, name) => {
+  return { running: runningInstances.has(name) };
 });
 
 ipcMain.handle('get-versions', async () => {
@@ -326,4 +345,40 @@ ipcMain.handle('select-icon', async () => {
 
 ipcMain.handle('get-platform', () => {
   return process.platform;
+});
+
+// Create console window
+function createConsoleWindow() {
+  if (consoleWindow && !consoleWindow.isDestroyed()) {
+    consoleWindow.focus();
+    return;
+  }
+  
+  consoleWindow = new BrowserWindow({
+    width: 900,
+    height: 600,
+    minWidth: 600,
+    minHeight: 400,
+    title: 'Minecraft Console',
+    icon: path.join(__dirname, '..', 'assets', 'icon.png'),
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+      preload: path.join(__dirname, 'preload.js')
+    },
+    backgroundColor: '#0d1117',
+    autoHideMenuBar: true,
+    show: true
+  });
+  
+  consoleWindow.loadFile(path.join(__dirname, 'renderer', 'console.html'));
+  
+  consoleWindow.on('closed', () => {
+    consoleWindow = null;
+  });
+}
+
+// IPC handler to open console window
+ipcMain.handle('open-console', () => {
+  createConsoleWindow();
 });

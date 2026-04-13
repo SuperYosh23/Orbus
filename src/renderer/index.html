@@ -6,6 +6,7 @@
     <title>Orbus Launcher</title>
     <link rel="stylesheet" href="viso.css">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body data-theme="viso">
     <div id="app" class="app-container">
@@ -170,10 +171,8 @@
                         </div>
                     </div>
                     <button class="viso-btn viso-btn-primary viso-btn-lg" id="launch-btn" style="width: 100%;">
-                        <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 8px;">
-                            <path d="M3 2l10 6-10 6V2z" fill="currentColor"/>
-                        </svg>
-                        LAUNCH GAME
+                        <i class="fas fa-play" style="margin-right: 8px;"></i>
+                        <span id="launch-btn-text">LAUNCH GAME</span>
                     </button>
                 </div>
             </div>
@@ -270,15 +269,6 @@
                 </button>
             </div>
         </div>
-    </div>
-
-    <!-- Console Logs Window -->
-    <div id="console-window" class="console-window" style="display: none;">
-        <div class="console-header">
-            <span class="viso-label">Minecraft Console</span>
-            <button class="viso-btn viso-btn-icon viso-btn-ghost" id="console-close">&times;</button>
-        </div>
-        <div class="console-content" id="console-content"></div>
     </div>
 
     <script src="app.js"></script>

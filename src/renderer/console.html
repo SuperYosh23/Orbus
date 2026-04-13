@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="viso">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Console</title>
+    <link rel="stylesheet" href="viso.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--viso-bg-primary);
+            color: var(--viso-text-secondary);
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.8rem;
+            line-height: 1.6;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .console-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-3) var(--space-4);
+            background: var(--glass-bg);
+            border-bottom: 1px solid var(--glass-border);
+            -webkit-app-region: drag;
+        }
+        
+        .console-title {
+            color: var(--viso-text-primary);
+            font-weight: var(--font-semibold);
+            font-family: var(--viso-font);
+        }
+        
+        .console-controls {
+            display: flex;
+            gap: var(--space-2);
+            -webkit-app-region: no-drag;
+        }
+        
+        .console-content {
+            flex: 1;
+            padding: var(--space-3);
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+        .console-line {
+            margin-bottom: 2px;
+        }
+        
+        .viso-btn-icon {
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Scrollbar styling */
+        .console-content::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .console-content::-webkit-scrollbar-track {
+            background: var(--viso-bg-primary);
+        }
+        
+        .console-content::-webkit-scrollbar-thumb {
+            background: var(--viso-bg-tertiary);
+            border-radius: var(--radius-full);
+        }
+        
+        .console-content::-webkit-scrollbar-thumb:hover {
+            background: var(--viso-accent);
+        }
+    </style>
+</head>
+<body data-theme="viso">
+    <div class="console-header">
+        <span class="console-title">Minecraft Console</span>
+        <div class="console-controls">
+            <button class="viso-btn viso-btn-icon viso-btn-danger" id="clear-btn" title="Clear Log">
+                <i class="fas fa-trash-alt"></i>
+            </button>
+            <button class="viso-btn viso-btn-icon viso-btn-ghost" id="close-btn" title="Close Window">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+    <div class="console-content" id="console-content"></div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+        const consoleContent = document.getElementById('console-content');
+        
+        // Receive console logs from main process
+        ipcRenderer.on('console-log', (event, data) => {
+            const line = document.createElement('div');
+            line.className = 'console-line';
+            line.textContent = data.line;
+            consoleContent.appendChild(line);
+            consoleContent.scrollTop = consoleContent.scrollHeight;
+            
+            // Limit lines to prevent memory issues
+            while (consoleContent.children.length > 10000) {
+                consoleContent.removeChild(consoleContent.firstChild);
+            }
+        });
+        
+        // Clear button
+        document.getElementById('clear-btn').addEventListener('click', () => {
+            consoleContent.innerHTML = '';
+        });
+        
+        // Close button
+        document.getElementById('close-btn').addEventListener('click', () => {
+            window.close();
+        });
+        
+        // Handle window close
+        window.addEventListener('beforeunload', () => {
+            ipcRenderer.removeAllListeners('console-log');
+        });
+    </script>
+</body>
+</html>
