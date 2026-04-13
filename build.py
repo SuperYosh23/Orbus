@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 SuperYosh23
 """
 Build script for Orbus Launcher
 Creates executables for Windows and Linux platforms
