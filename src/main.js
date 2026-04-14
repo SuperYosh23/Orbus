@@ -36,7 +36,11 @@ function getPythonCommand() {
 
 // Start Python backend
 function startPythonBackend() {
-  const backendPath = path.join(__dirname, '..', 'backend', 'api_server.py');
+  // When packaged, extraResources are in process.resourcesPath
+  // When dev, they're in the source directory
+  const backendPath = app.isPackaged 
+    ? path.join(process.resourcesPath, 'backend', 'api_server.py')
+    : path.join(__dirname, '..', 'backend', 'api_server.py');
   const pythonCmd = getPythonCommand();
   
   console.log(`Starting Python backend: ${pythonCmd} ${backendPath}`);
