@@ -42,14 +42,34 @@
     ],
     "mac": {
       "category": "public.app-category.games",
-      "icon": "assets/icon.png"
+      "icon": "assets/icon.png",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64"]
+        },
+        {
+          "target": "dmg",
+          "arch": ["arm64"]
+        }
+      ]
     },
     "win": {
-      "target": "nsis",
+      "target": [
+        {
+          "target": "zip",
+          "arch": ["x64"]
+        }
+      ],
       "icon": "assets/icon.png"
     },
     "linux": {
-      "target": "AppImage",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        }
+      ],
       "icon": "assets/icon.png"
     }
   }
