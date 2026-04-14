@@ -22,6 +22,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def install_dependencies():
     """Try to install dependencies using available pip"""
+    # Check if running from a venv - if so, assume deps are already installed
+    if hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
+        print("[Python] Running from virtual environment, skipping dependency installation")
+        return True
+    
     deps = ["minecraft-launcher-lib", "requests"]
     
     # Try different pip methods

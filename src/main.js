@@ -15,13 +15,26 @@ const BACKEND_PORT = 15556;
 
 // Determine platform-specific Python command
 function getPythonCommand() {
-  // Check for venv Python first (in development)
+  // When packaged, check for bundled venv in resourcesPath first
+  if (app.isPackaged) {
+    const bundledVenv = path.join(process.resourcesPath, 'python_venv', 'bin', 'python');
+    if (fs.existsSync(bundledVenv)) {
+      return bundledVenv;
+    }
+    
+    const bundledVenvWin = path.join(process.resourcesPath, 'python_venv', 'Scripts', 'python.exe');
+    if (fs.existsSync(bundledVenvWin)) {
+      return bundledVenvWin;
+    }
+  }
+  
+  // Check for venv Python in development
   const venvPython = path.join(__dirname, '..', 'backend', 'venv', 'bin', 'python');
   if (fs.existsSync(venvPython)) {
     return venvPython;
   }
   
-  // Check for venv on Windows
+  // Check for venv on Windows (dev)
   const venvPythonWin = path.join(__dirname, '..', 'backend', 'venv', 'Scripts', 'python.exe');
   if (fs.existsSync(venvPythonWin)) {
     return venvPythonWin;

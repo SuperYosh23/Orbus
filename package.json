@@ -38,6 +38,11 @@
       {
         "from": "backend/",
         "to": "backend/"
+      },
+      {
+        "from": "python_venv/",
+        "to": "python_venv/",
+        "filter": ["**/*"]
       }
     ],
     "mac": {

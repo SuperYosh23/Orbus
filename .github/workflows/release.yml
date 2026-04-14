@@ -46,6 +46,13 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r backend/requirements.txt
     
+    - name: Create Python venv for Linux (bundle dependencies)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        python -m venv python_venv
+        source python_venv/bin/activate
+        pip install -r backend/requirements.txt
+    
     - name: Build Electron app
       run: npm run build:${{ matrix.platform }}
       env:
